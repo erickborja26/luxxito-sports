@@ -18,7 +18,11 @@ export default function Register() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.email || !form.name) return toast.error("Completa los campos requeridos");
-    register({ ...form, role });
+    const gmailRegex = /^[^\s@]+@gmail\.com$/i;
+    if (!gmailRegex.test(String(form.email).trim())) {
+      return toast.error("Solo se permiten correos @gmail.com");
+    }
+    register({ ...form, email: String(form.email).trim().toLowerCase(), role });
     toast.success("Cuenta creada correctamente");
     nav(role === "admin" ? "/admin/onboarding" : "/jugador");
   };
