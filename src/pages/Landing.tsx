@@ -32,12 +32,18 @@ export default function Landing() {
       </header>
 
       {/* Hero */}
-      <section className="relative pt-28 pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
-        <div className="absolute inset-0 -z-10">
-          <img src={hero} alt="Cancha de fútbol al atardecer" className="w-full h-full object-cover" width={1920} height={1080} />
-          <div className="absolute inset-0 bg-gradient-hero opacity-90" />
+      <section className="relative isolate pt-28 pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
+        <div className="absolute inset-0 z-0">
+          <img
+            src={hero}
+            alt="Cancha de fútbol al atardecer"
+            className="w-full h-full object-cover object-center"
+            width={1920}
+            height={1080}
+          />
+          <div className="absolute inset-0 bg-gradient-hero opacity-65" />
         </div>
-        <div className="container text-center text-primary-foreground">
+        <div className="container relative z-10 text-center text-primary-foreground">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 text-xs font-medium mb-6 backdrop-blur">
             <Zap className="w-3.5 h-3.5 text-accent" /> Disponibilidad en tiempo real
           </div>
