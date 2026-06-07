@@ -18,7 +18,11 @@ export default function Login() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return toast.error("Ingresa tu correo");
-    login(email, role);
+    const gmailRegex = /^[^\s@]+@gmail\.com$/i;
+    if (!gmailRegex.test(email.trim())) {
+      return toast.error("Solo se permiten correos @gmail.com");
+    }
+    login(email.trim().toLowerCase(), role);
     toast.success("Bienvenido a LuxxitoSports");
     nav(role === "admin" ? "/admin" : role === "soporte" ? "/soporte" : "/jugador");
   };
