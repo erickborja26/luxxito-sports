@@ -12,6 +12,7 @@ const menus: Record<Role, { to: string; label: string; icon: any }[]> = {
   jugador: [
     { to: "/jugador", label: "Dashboard", icon: LayoutDashboard },
     { to: "/jugador/disponibilidad", label: "Disponibilidad", icon: Calendar },
+    { to: "/jugador/reservas", label: "Mis reservas", icon: Receipt },
   ],
   admin: [
     { to: "/admin", label: "Resumen", icon: LayoutDashboard },

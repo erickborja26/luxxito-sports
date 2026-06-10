@@ -15,6 +15,6 @@ const map: Record<string, string> = {
   DAÑADO: "bg-destructive text-destructive-foreground",
 };
 
-export const StatusBadge = ({ status, className }: { status: string; className?: string }) => (
-  <Badge className={cn(map[status] || "bg-secondary text-secondary-foreground", "font-semibold", className)}>{status}</Badge>
+export const StatusBadge = ({ status, label, className }: { status: string; label?: string; className?: string }) => (
+  <Badge className={cn(map[status] || "bg-secondary text-secondary-foreground", "font-semibold", className)}>{label || status}</Badge>
 );
