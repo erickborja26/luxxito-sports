@@ -1,14 +1,15 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth, Role } from "@/context/AuthContext";
 import {
-  LayoutDashboard, Calendar, Trophy, CreditCard, Settings, Users,
-  BarChart3, Wrench, LogOut, Menu, X, Building2, Shield, Activity, DollarSign, Package, Receipt
+  LayoutDashboard, Calendar, Trophy,
+  BarChart3, LogOut, Menu, X, Building2, Activity, DollarSign, Package, Receipt
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-const menus: Record<Role, { to: string; label: string; icon: any }[]> = {
+const menus: Record<Role, { to: string; label: string; icon: LucideIcon }[]> = {
   jugador: [
     { to: "/jugador", label: "Dashboard", icon: LayoutDashboard },
     { to: "/jugador/disponibilidad", label: "Disponibilidad", icon: Calendar },
@@ -48,9 +49,11 @@ export default function AppLayout() {
       <aside className="hidden lg:flex flex-col w-64 bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
         <div className="px-6 py-5 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-gradient-accent grid place-items-center shadow-glow">
-              <Trophy className="w-5 h-5 text-accent-foreground" />
-            </div>
+            <img
+              src="/luxxito-sports-logo.png"
+              alt="LuxxitoSports"
+              className="h-10 w-auto"
+            />
             <div>
               <div className="font-bold text-base tracking-tight">LuxxitoSports</div>
               <div className="text-xs opacity-60 capitalize">Panel {user.role}</div>
@@ -85,7 +88,14 @@ export default function AppLayout() {
         <div className="lg:hidden fixed inset-0 z-50 bg-black/50" onClick={() => setOpen(false)}>
           <aside className="w-72 h-full bg-sidebar text-sidebar-foreground p-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
-              <span className="font-bold">LuxxitoSports</span>
+              <div className="flex items-center gap-2">
+                <img
+                  src="/luxxito-sports-logo.png"
+                  alt="LuxxitoSports"
+                  className="h-9 w-auto"
+                />
+                <span className="font-bold">LuxxitoSports</span>
+              </div>
               <button onClick={() => setOpen(false)}><X className="w-5 h-5" /></button>
             </div>
             <nav className="space-y-1">
@@ -106,7 +116,11 @@ export default function AppLayout() {
         <header className="h-14 bg-card border-b flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
           <div className="flex items-center gap-3">
             <button className="lg:hidden" onClick={() => setOpen(true)}><Menu className="w-5 h-5" /></button>
-            <span className="font-semibold lg:hidden">LuxxitoSports</span>
+            <img
+              src="/luxxito-sports-logo.png"
+              alt="LuxxitoSports"
+              className="h-8 w-auto lg:hidden"
+            />
           </div>
           <div className="flex items-center gap-3">
             <Badge className={roleBadge[user.role]}>{user.role.toUpperCase()}</Badge>
