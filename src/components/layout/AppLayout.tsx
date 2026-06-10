@@ -1,12 +1,13 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth, Role } from "@/context/AuthContext";
 import {
-  LayoutDashboard, Calendar, Trophy, CreditCard, Settings, Users,
-  BarChart3, Wrench, LogOut, Menu, X, Building2, Shield, Activity, DollarSign, Package, Receipt
+  LayoutDashboard, Calendar, Trophy, LogOut, Menu, X, Building2, Activity,
+  BarChart3, DollarSign, Package, Receipt
 } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import SportsBackground from "@/components/SportsBackground";
+import { cn } from "@/lib/utils";
 
 const menus: Record<Role, { to: string; label: string; icon: any }[]> = {
   jugador: [
@@ -35,6 +36,75 @@ const roleBadge: Record<Role, string> = {
   soporte: "bg-warning text-warning-foreground",
 };
 
+const roleLabel: Record<Role, string> = {
+  jugador: "Jugador",
+  admin: "Administrador",
+  soporte: "Soporte",
+};
+
+const NavItems = ({ items, onNavigate }: { items: { to: string; label: string; icon: any }[]; onNavigate?: () => void }) => (
+  <>
+    {items.map((it) => (
+      <NavLink
+        key={it.to}
+        to={it.to}
+        end
+        onClick={onNavigate}
+        className={({ isActive }) =>
+          cn(
+            "group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+            isActive
+              ? "bg-white/[0.07] text-white"
+              : "text-sidebar-foreground/70 hover:bg-white/[0.04] hover:text-sidebar-foreground"
+          )
+        }
+      >
+        {({ isActive }) => (
+          <>
+            <span
+              aria-hidden="true"
+              className={cn(
+                "absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-accent transition-all duration-200",
+                isActive ? "opacity-100" : "opacity-0 group-hover:opacity-40"
+              )}
+            />
+            <span
+              className={cn(
+                "w-8 h-8 rounded-lg grid place-items-center transition-colors duration-200",
+                isActive ? "bg-accent/20 text-accent" : "bg-white/[0.04] text-sidebar-foreground/60 group-hover:text-sidebar-foreground"
+              )}
+            >
+              <it.icon className="w-4 h-4" />
+            </span>
+            {it.label}
+            {isActive && <span aria-hidden="true" className="ml-auto w-1.5 h-1.5 rounded-full bg-accent shadow-glow" />}
+          </>
+        )}
+      </NavLink>
+    ))}
+  </>
+);
+
+const SidebarFooter = ({ name, role, onLogout }: { name: string; role: Role; onLogout: () => void }) => (
+  <div className="p-3 border-t border-sidebar-border space-y-2">
+    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-sidebar-accent/60">
+      <div className="w-9 h-9 rounded-full bg-gradient-accent grid place-items-center text-accent-foreground font-semibold shrink-0 shadow-glow">
+        {name[0]?.toUpperCase()}
+      </div>
+      <div className="min-w-0">
+        <div className="text-sm font-medium truncate">{name}</div>
+        <div className="text-[11px] opacity-60">{roleLabel[role]}</div>
+      </div>
+    </div>
+    <button
+      onClick={onLogout}
+      className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm text-sidebar-foreground/70 hover:bg-destructive/15 hover:text-destructive transition-colors duration-200 cursor-pointer"
+    >
+      <LogOut className="w-4 h-4" /> Cerrar sesión
+    </button>
+  </div>
+);
+
 export default function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -42,71 +112,76 @@ export default function AppLayout() {
   if (!user) return null;
 
   const items = menus[user.role];
+  const salir = () => { logout(); navigate("/"); };
 
   return (
     <div className="min-h-screen flex w-full bg-muted/30">
       {/* Sidebar desktop */}
-      <aside className="hidden lg:flex flex-col w-64 bg-sidebar text-sidebar-foreground border-r border-sidebar-border">
-        <div className="px-6 py-5 border-b border-sidebar-border">
+      <aside className="hidden lg:flex flex-col w-64 bg-sidebar text-sidebar-foreground border-r border-sidebar-border overflow-hidden sticky top-0 h-screen shrink-0">
+        {/* Resplandor decorativo */}
+        <div aria-hidden="true" className="absolute -top-20 -left-20 w-56 h-56 rounded-full bg-accent/15 blur-3xl pointer-events-none motion-safe:animate-drift" />
+
+        <div className="px-6 py-5 border-b border-sidebar-border relative">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-gradient-accent grid place-items-center shadow-glow">
+            <div className="w-10 h-10 rounded-xl bg-gradient-accent grid place-items-center shadow-glow">
               <Trophy className="w-5 h-5 text-accent-foreground" />
             </div>
             <div>
               <div className="font-bold text-base tracking-tight">LuxxitoSports</div>
-              <div className="text-xs opacity-60 capitalize">Panel {user.role}</div>
+              <div className="text-xs opacity-60">Panel {roleLabel[user.role]}</div>
             </div>
           </div>
         </div>
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {items.map((it) => (
-            <NavLink
-              key={it.to}
-              to={it.to}
-              end
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-                  isActive ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-glow" : "hover:bg-sidebar-accent"
-                }`
-              }
-            >
-              <it.icon className="w-4 h-4" /> {it.label}
-            </NavLink>
-          ))}
+
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto relative">
+          <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-widest opacity-40">Menú</p>
+          <NavItems items={items} />
         </nav>
-        <div className="p-3 border-t border-sidebar-border">
-          <button onClick={() => { logout(); navigate("/"); }} className="flex items-center gap-2 w-full px-3 py-2 rounded-md text-sm hover:bg-sidebar-accent">
-            <LogOut className="w-4 h-4" /> Cerrar sesión
-          </button>
-        </div>
+
+        <SidebarFooter name={user.name} role={user.role} onLogout={salir} />
       </aside>
 
-      {/* Mobile drawer */}
+      {/* Drawer móvil */}
       {open && (
-        <div className="lg:hidden fixed inset-0 z-50 bg-black/50" onClick={() => setOpen(false)}>
-          <aside className="w-72 h-full bg-sidebar text-sidebar-foreground p-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-6">
-              <span className="font-bold">LuxxitoSports</span>
-              <button onClick={() => setOpen(false)}><X className="w-5 h-5" /></button>
+        <div className="lg:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setOpen(false)}>
+          <aside
+            className="w-72 h-full bg-sidebar text-sidebar-foreground flex flex-col rounded-r-2xl shadow-elegant motion-safe:animate-slide-in-left overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center px-5 py-4 border-b border-sidebar-border">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-xl bg-gradient-accent grid place-items-center shadow-glow">
+                  <Trophy className="w-4 h-4 text-accent-foreground" />
+                </div>
+                <span className="font-bold">LuxxitoSports</span>
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                aria-label="Cerrar menú"
+                className="w-9 h-9 grid place-items-center rounded-lg hover:bg-sidebar-accent transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <nav className="space-y-1">
-              {items.map((it) => (
-                <NavLink key={it.to} to={it.to} end onClick={() => setOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 px-3 py-2.5 rounded-md text-sm ${isActive ? "bg-sidebar-primary text-sidebar-primary-foreground" : "hover:bg-sidebar-accent"}`
-                  }>
-                  <it.icon className="w-4 h-4" /> {it.label}
-                </NavLink>
-              ))}
+            <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+              <NavItems items={items} onNavigate={() => setOpen(false)} />
             </nav>
+            <SidebarFooter name={user.name} role={user.role} onLogout={salir} />
           </aside>
         </div>
       )}
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 bg-card border-b flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
+      <div className="flex-1 flex flex-col min-w-0 relative">
+        {user.role === "jugador" && <SportsBackground />}
+        <header className="h-14 bg-card/80 backdrop-blur-md border-b flex items-center justify-between px-4 lg:px-6 sticky top-0 z-30">
           <div className="flex items-center gap-3">
-            <button className="lg:hidden" onClick={() => setOpen(true)}><Menu className="w-5 h-5" /></button>
+            <button
+              className="lg:hidden w-10 h-10 grid place-items-center rounded-lg hover:bg-muted transition-colors cursor-pointer"
+              onClick={() => setOpen(true)}
+              aria-label="Abrir menú"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
             <span className="font-semibold lg:hidden">LuxxitoSports</span>
           </div>
           <div className="flex items-center gap-3">
@@ -120,7 +195,7 @@ export default function AppLayout() {
             </div>
           </div>
         </header>
-        <main className="flex-1 p-4 lg:p-8 animate-fade-in">
+        <main className="flex-1 p-4 lg:p-8 animate-fade-in relative z-10">
           <Outlet />
         </main>
       </div>

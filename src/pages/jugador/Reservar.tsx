@@ -230,7 +230,7 @@ export default function Reservar() {
                   role="radio"
                   aria-checked={metodo === m.v}
                   onClick={() => setMetodo(m.v)}
-                  className={cn("p-4 rounded-lg border-2 transition-colors duration-200 flex flex-col items-center gap-1.5 cursor-pointer", metodo === m.v ? "border-accent bg-accent/5" : "border-border hover:border-muted-foreground")}
+                  className={cn("p-3 sm:p-4 rounded-lg border-2 transition-colors duration-200 flex flex-col items-center gap-1.5 cursor-pointer", metodo === m.v ? "border-accent bg-accent/5" : "border-border hover:border-muted-foreground")}
                 >
                   <m.i className="w-6 h-6" />
                   <span className="text-sm font-medium">{m.v}</span>
@@ -256,7 +256,7 @@ export default function Reservar() {
         )}
       </Card>
 
-      <div className="flex justify-between gap-2">
+      <div className="flex flex-wrap justify-between gap-2">
         <Button
           variant="outline"
           disabled={pagando}

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useReservas } from "@/context/ReservasContext";
 import { Trophy, Calendar, MapPin, Star, Plus, CalendarCheck } from "lucide-react";
+import { CourtLines } from "@/components/SportsBackground";
 
 const scoringStyles: Record<string, { label: string; cls: string }> = {
   nuevo: { label: "Nuevo", cls: "from-slate-400 to-slate-600" },
@@ -29,20 +30,43 @@ export default function JugadorDashboard() {
 
   return (
     <div className="space-y-6 max-w-7xl">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Hola, {user?.name} 👋</h1>
-          <p className="text-muted-foreground">Tus reservas y horarios favoritos en un solo lugar.</p>
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-hero text-white p-6 lg:p-10 shadow-elegant">
+        {/* Geometría abstracta del hero */}
+        <div aria-hidden="true" className="absolute inset-0 pointer-events-none select-none">
+          <div className="absolute -right-32 -top-44 w-[26rem] h-[26rem] motion-safe:animate-spin-slow [animation-duration:120s]">
+            <CourtLines className="w-full h-full text-white opacity-[0.10]" />
+          </div>
+          <div className="absolute -left-16 -bottom-20 w-72 h-72 rounded-full bg-accent/30 blur-3xl motion-safe:animate-aurora" />
+          <div className="absolute -inset-x-1/4 top-0 h-full -rotate-12 bg-gradient-to-r from-transparent via-white/[0.05] to-transparent motion-safe:animate-beam" />
+          {/* Retícula sutil */}
+          <div
+            className="absolute inset-0 opacity-50"
+            style={{
+              backgroundImage: "radial-gradient(rgba(255,255,255,0.14) 1px, transparent 1px)",
+              backgroundSize: "24px 24px",
+              maskImage: "radial-gradient(ellipse 70% 90% at 85% 50%, black 20%, transparent 70%)",
+              WebkitMaskImage: "radial-gradient(ellipse 70% 90% at 85% 50%, black 20%, transparent 70%)",
+            }}
+          />
         </div>
-        <div className="flex gap-2">
-          <Link to="/jugador/reservas">
-            <Button size="lg" variant="outline"><CalendarCheck className="w-4 h-4 mr-2" />Mis reservas</Button>
-          </Link>
-          <Link to="/jugador/disponibilidad">
-            <Button size="lg" className="bg-gradient-accent border-0 shadow-glow">
-              <Plus className="w-4 h-4 mr-2" />Reservar cancha
-            </Button>
-          </Link>
+
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div>
+            <h1 className="text-3xl lg:text-4xl font-bold">Hola, {user?.name} 👋</h1>
+            <p className="text-white/75 mt-1">Tus reservas y horarios favoritos en un solo lugar.</p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Link to="/jugador/reservas">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto bg-white/10 border-white/30 text-white hover:bg-white/20 hover:text-white backdrop-blur-sm transition-all duration-200">
+                <CalendarCheck className="w-4 h-4 mr-2" />Mis reservas
+              </Button>
+            </Link>
+            <Link to="/jugador/disponibilidad">
+              <Button size="lg" className="w-full sm:w-auto bg-gradient-accent border-0 shadow-glow hover:-translate-y-0.5 hover:brightness-110 transition-all duration-200">
+                <Plus className="w-4 h-4 mr-2" />Reservar cancha
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
 
