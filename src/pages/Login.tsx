@@ -44,7 +44,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
+    <div className="min-h-[100svh] grid lg:grid-cols-2">
       {/* Panel de marca */}
       <div className="hidden lg:flex relative overflow-hidden bg-gradient-hero p-12 flex-col justify-between text-primary-foreground">
         {/* Capas decorativas premium */}
@@ -117,7 +117,7 @@ export default function Login() {
       </div>
 
       {/* Panel de formulario */}
-      <div className="relative flex items-center justify-center p-6 md:p-10 bg-muted/30 overflow-hidden">
+      <div className="relative flex items-center justify-center overflow-hidden bg-muted/30 p-4 py-8 sm:p-6 md:p-10">
         <div
           aria-hidden="true"
           className="absolute inset-0 pointer-events-none"
@@ -139,7 +139,7 @@ export default function Login() {
             <span className="font-bold text-xl">LuxxitoSports</span>
           </Link>
 
-          <div className="rounded-3xl bg-card/90 backdrop-blur-xl border shadow-elegant p-8">
+          <div className="rounded-3xl bg-card/90 backdrop-blur-xl border shadow-elegant p-6 sm:p-8">
             <h1 className="text-2xl font-bold mb-1">Iniciar sesión</h1>
             <p className="text-sm text-muted-foreground mb-6">Accede a tu panel personal</p>
 
@@ -168,7 +168,7 @@ export default function Login() {
                     type="button"
                     onClick={() => setVerPass(v => !v)}
                     aria-label={verPass ? "Ocultar contraseña" : "Mostrar contraseña"}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    className="absolute right-2 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                   >
                     {verPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -186,7 +186,7 @@ export default function Login() {
                       aria-checked={role === r.v}
                       onClick={() => setRole(r.v)}
                       className={cn(
-                        "p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 text-xs font-medium transition-colors duration-200 cursor-pointer",
+                        "p-3 rounded-xl border-2 flex flex-col items-center gap-1.5 text-xs font-medium transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer",
                         role === r.v ? "border-accent bg-accent/5 text-foreground" : "border-border text-muted-foreground hover:border-muted-foreground"
                       )}
                     >

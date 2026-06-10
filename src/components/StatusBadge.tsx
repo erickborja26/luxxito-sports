@@ -16,5 +16,5 @@ const map: Record<string, string> = {
 };
 
 export const StatusBadge = ({ status, label, className }: { status: string; label?: string; className?: string }) => (
-  <Badge className={cn(map[status] || "bg-secondary text-secondary-foreground", "font-semibold", className)}>{label || status}</Badge>
+  <Badge className={cn(map[status] || "bg-secondary text-secondary-foreground", "whitespace-nowrap border-0 font-semibold shadow-sm", className)}>{label || status}</Badge>
 );

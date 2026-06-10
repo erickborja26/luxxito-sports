@@ -145,8 +145,11 @@ export default function AppLayout() {
       {open && (
         <div className="lg:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={() => setOpen(false)}>
           <aside
-            className="w-72 h-full bg-sidebar text-sidebar-foreground flex flex-col rounded-r-2xl shadow-elegant motion-safe:animate-slide-in-left overflow-hidden"
+            className="w-[min(18rem,calc(100vw-2rem))] h-full bg-sidebar text-sidebar-foreground flex flex-col rounded-r-2xl shadow-elegant motion-safe:animate-slide-in-left overflow-hidden"
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menú principal"
           >
             <div className="flex justify-between items-center px-5 py-4 border-b border-sidebar-border">
               <div className="flex items-center gap-2">
@@ -185,7 +188,7 @@ export default function AppLayout() {
             <span className="font-semibold lg:hidden">LuxxitoSports</span>
           </div>
           <div className="flex items-center gap-3">
-            <Badge className={roleBadge[user.role]}>{user.role.toUpperCase()}</Badge>
+            <Badge className={cn(roleBadge[user.role], "border-0 shadow-sm")}>{roleLabel[user.role]}</Badge>
             <div className="text-sm hidden sm:block">
               <div className="font-medium leading-tight">{user.name}</div>
               <div className="text-xs text-muted-foreground">{user.email}</div>

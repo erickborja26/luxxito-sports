@@ -33,7 +33,7 @@ export default function Register() {
   const set = (k: string) => (e: any) => setForm({ ...form, [k]: e.target.value });
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-hero flex items-center justify-center p-4 sm:p-6">
+    <div className="min-h-[100svh] relative overflow-x-hidden bg-gradient-hero flex items-center justify-center p-4 py-8 sm:p-6">
       {/* Capas decorativas premium */}
       <div aria-hidden="true" className="absolute inset-0 pointer-events-none select-none">
         <div className="absolute -right-48 -top-48 w-[34rem] h-[34rem] motion-safe:animate-spin-slow [animation-duration:140s]">
@@ -65,9 +65,9 @@ export default function Register() {
           <p className="text-sm text-muted-foreground mb-6">Elige tu tipo de cuenta para empezar</p>
 
           <Tabs value={role} onValueChange={(v) => setRole(v as Role)}>
-            <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="jugador">Soy Jugador</TabsTrigger>
-              <TabsTrigger value="admin">Tengo un Complejo</TabsTrigger>
+            <TabsList className="grid h-auto min-h-10 grid-cols-2 w-full">
+              <TabsTrigger value="jugador" className="h-full whitespace-normal py-2">Soy Jugador</TabsTrigger>
+              <TabsTrigger value="admin" className="h-full whitespace-normal py-2">Tengo un Complejo</TabsTrigger>
             </TabsList>
 
             <form onSubmit={submit} className="space-y-4 mt-6">
