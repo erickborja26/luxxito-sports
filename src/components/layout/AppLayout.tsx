@@ -1,15 +1,16 @@
 import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth, Role } from "@/context/AuthContext";
 import {
-  LayoutDashboard, Calendar, Trophy, LogOut, Menu, X, Building2, Activity,
-  BarChart3, DollarSign, Package, Receipt
+  LayoutDashboard, Calendar, Trophy,
+  BarChart3, LogOut, Menu, X, Building2, Activity, DollarSign, Package, Receipt
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import SportsBackground from "@/components/SportsBackground";
 import { cn } from "@/lib/utils";
 
-const menus: Record<Role, { to: string; label: string; icon: any }[]> = {
+const menus: Record<Role, { to: string; label: string; icon: LucideIcon }[]> = {
   jugador: [
     { to: "/jugador", label: "Dashboard", icon: LayoutDashboard },
     { to: "/jugador/disponibilidad", label: "Disponibilidad", icon: Calendar },
@@ -123,9 +124,11 @@ export default function AppLayout() {
 
         <div className="px-6 py-5 border-b border-sidebar-border relative">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-gradient-accent grid place-items-center shadow-glow">
-              <Trophy className="w-5 h-5 text-accent-foreground" />
-            </div>
+            <img
+              src="/luxxito-sports-logo.png"
+              alt="LuxxitoSports"
+              className="h-10 w-auto"
+            />
             <div>
               <div className="font-bold text-base tracking-tight">LuxxitoSports</div>
               <div className="text-xs opacity-60">Panel {roleLabel[user.role]}</div>
@@ -153,9 +156,11 @@ export default function AppLayout() {
           >
             <div className="flex justify-between items-center px-5 py-4 border-b border-sidebar-border">
               <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-xl bg-gradient-accent grid place-items-center shadow-glow">
-                  <Trophy className="w-4 h-4 text-accent-foreground" />
-                </div>
+                <img
+                  src="/luxxito-sports-logo.png"
+                  alt="LuxxitoSports"
+                  className="h-9 w-auto"
+                />
                 <span className="font-bold">LuxxitoSports</span>
               </div>
               <button
@@ -185,6 +190,11 @@ export default function AppLayout() {
             >
               <Menu className="w-5 h-5" />
             </button>
+            <img
+              src="/luxxito-sports-logo.png"
+              alt="LuxxitoSports"
+              className="h-8 w-auto lg:hidden"
+            />
             <span className="font-semibold lg:hidden">LuxxitoSports</span>
           </div>
           <div className="flex items-center gap-3">

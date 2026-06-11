@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Trophy, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useAuth, Role } from "@/context/AuthContext";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -56,9 +56,11 @@ export default function Register() {
       <div className="relative w-full max-w-xl">
         <div className="rounded-3xl bg-card/95 backdrop-blur-xl border shadow-elegant p-6 sm:p-8">
           <Link to="/" className="flex items-center gap-2 mb-6 w-fit">
-            <div className="w-10 h-10 rounded-xl bg-gradient-accent grid place-items-center shadow-glow">
-              <Trophy className="w-5 h-5 text-accent-foreground" />
-            </div>
+            <img
+              src="/luxxito-sports-logo.png"
+              alt="LuxxitoSports"
+              className="h-12 w-auto"
+            />
             <span className="font-bold text-xl">LuxxitoSports</span>
           </Link>
           <h1 className="text-2xl font-bold mb-1">Crear cuenta</h1>

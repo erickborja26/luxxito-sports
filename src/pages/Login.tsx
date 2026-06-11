@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Trophy, Mail, Lock, Eye, EyeOff, Loader2, User, Building2, Headphones, CalendarCheck, MapPin, Star } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Loader2, User, Building2, Headphones, CalendarCheck, MapPin, Star } from "lucide-react";
 import { useAuth, Role } from "@/context/AuthContext";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -67,9 +67,11 @@ export default function Login() {
         </div>
 
         <Link to="/" className="relative z-10 flex items-center gap-2 w-fit">
-          <div className="w-10 h-10 rounded-xl bg-gradient-accent grid place-items-center shadow-glow">
-            <Trophy className="w-5 h-5" />
-          </div>
+          <img
+            src="/luxxito-sports-logo.png"
+            alt="LuxxitoSports"
+            className="h-12 w-auto"
+          />
           <span className="font-bold text-xl">LuxxitoSports</span>
         </Link>
 
@@ -133,9 +135,11 @@ export default function Login() {
         <div className="relative w-full max-w-md">
           {/* Logo en móvil */}
           <Link to="/" className="lg:hidden flex items-center justify-center gap-2 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-gradient-accent grid place-items-center shadow-glow">
-              <Trophy className="w-5 h-5 text-accent-foreground" />
-            </div>
+            <img
+              src="/luxxito-sports-logo.png"
+              alt="LuxxitoSports"
+              className="h-10 w-auto"
+            />
             <span className="font-bold text-xl">LuxxitoSports</span>
           </Link>
 
