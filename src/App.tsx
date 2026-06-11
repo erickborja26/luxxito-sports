@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth, Role } from "@/context/AuthContext";
+import { ReservasProvider } from "@/context/ReservasContext";
 import { ReactNode } from "react";
 
 import Landing from "./pages/Landing";
@@ -15,6 +16,7 @@ import Disponibilidad from "./pages/jugador/Disponibilidad";
 import Reservar from "./pages/jugador/Reservar";
 import Comprobante from "./pages/jugador/Comprobante";
 import Confirmacion from "./pages/jugador/Confirmacion";
+import MisReservas from "./pages/jugador/MisReservas";
 import AdminDashboard from "./pages/admin/Dashboard";
 import Onboarding from "./pages/admin/Onboarding";
 import Canchas from "./pages/admin/Canchas";
@@ -41,6 +43,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <AuthProvider>
+        <ReservasProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Landing />} />
@@ -53,6 +56,7 @@ const App = () => (
               <Route path="/jugador/reservar" element={<Reservar />} />
               <Route path="/jugador/comprobante" element={<Comprobante />} />
               <Route path="/jugador/confirmacion" element={<Confirmacion />} />
+              <Route path="/jugador/reservas" element={<MisReservas />} />
             </Route>
 
             <Route element={<Guard roles={["admin"]}><AppLayout /></Guard>}>
@@ -73,6 +77,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        </ReservasProvider>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
