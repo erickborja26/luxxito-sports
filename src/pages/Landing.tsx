@@ -14,9 +14,11 @@ export default function Landing() {
       <header className="fixed top-0 inset-x-0 z-40 backdrop-blur-md bg-background/70 border-b">
         <div className="container flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-gradient-accent grid place-items-center shadow-glow">
-              <Trophy className="w-5 h-5 text-accent-foreground" />
-            </div>
+            <img
+              src="/luxxito-sports-logo.png"
+              alt="LuxxitoSports"
+              className="h-10 w-auto"
+            />
             <span className="font-bold text-lg">LuxxitoSports</span>
           </Link>
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium">

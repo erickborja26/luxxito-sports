@@ -25,7 +25,7 @@ export default function Onboarding() {
       <Card className="p-6 space-y-4">
         {step === 0 && (<>
           <h2 className="text-xl font-bold">Datos del complejo</h2>
-          <div><Label>Nombre</Label><Input placeholder="Luxxito San Borja" /></div>
+          <div><Label>Nombre</Label><Input placeholder="Mundialitos Club" /></div>
           <div><Label>Dirección</Label><Input placeholder="Av. Aviación 2500" /></div>
           <div className="grid grid-cols-2 gap-3">
             <div><Label>Ciudad</Label><Input defaultValue="Lima" /></div>

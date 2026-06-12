@@ -1,63 +1,171 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, CheckCircle } from "lucide-react";
+import { Upload, CheckCircle, Loader2, AlertTriangle, ImageIcon, X } from "lucide-react";
 import { toast } from "sonner";
+import { useReservas, ExtraReservado } from "@/context/ReservasContext";
+import { useAuth } from "@/context/AuthContext";
+import { Cancha, nombreComplejo } from "@/data/mock";
+
+type EstadoComprobante = {
+  sel: { cancha: Cancha; slot: { hora: string; precio: number }; fecha: string };
+  total: number;
+  extras: ExtraReservado[];
+  metodo: string;
+};
+
+const MAX_MB = 5;
 
 export default function Comprobante() {
   const loc = useLocation();
   const nav = useNavigate();
-  const { total = 100, metodo = "Yape" } = (loc.state as any) || {};
+  const { user } = useAuth();
+  const { agregarReserva } = useReservas();
+  const datos = loc.state as EstadoComprobante | null;
+
   const [preview, setPreview] = useState<string | null>(null);
-  const [met, setMet] = useState(metodo === "Tarjeta" ? "Yape" : metodo);
+  const [errorArchivo, setErrorArchivo] = useState<string | null>(null);
+  const [met, setMet] = useState(datos?.metodo === "Tarjeta" ? "Yape" : datos?.metodo || "Yape");
+  const [monto, setMonto] = useState(String(datos?.total ?? ""));
+  const [referencia, setReferencia] = useState("");
+  const [enviando, setEnviando] = useState(false);
+
+  useEffect(() => {
+    if (!datos) {
+      toast.info("Primero elige un horario y completa el paso de pago.");
+      nav("/jugador/disponibilidad", { replace: true });
+    }
+  }, [datos, nav]);
+
+  if (!datos) return null;
+
+  const total = datos.total;
+  const montoNum = Number(monto);
+  const montoDistinto = monto !== "" && !Number.isNaN(montoNum) && montoNum !== total;
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    const r = new FileReader(); r.onload = () => setPreview(r.result as string); r.readAsDataURL(f);
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (!f.type.startsWith("image/")) {
+      setErrorArchivo("El archivo debe ser una imagen (JPG, PNG o similar).");
+      setPreview(null);
+      return;
+    }
+    if (f.size > MAX_MB * 1024 * 1024) {
+      setErrorArchivo(`La imagen pesa demasiado. El máximo es ${MAX_MB} MB.`);
+      setPreview(null);
+      return;
+    }
+    setErrorArchivo(null);
+    const r = new FileReader();
+    r.onload = () => setPreview(r.result as string);
+    r.readAsDataURL(f);
   };
 
-  const enviar = (e: React.FormEvent) => {
+  const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!preview) return toast.error("Sube una imagen del comprobante");
-    toast.success("Comprobante enviado. Estado: PENDIENTE_REVISION");
-    nav("/jugador/confirmacion", { state: { sel: loc.state?.sel, total, metodo: met, pendiente: true } });
+    if (!preview) {
+      setErrorArchivo("Sube una foto o captura de tu comprobante para continuar.");
+      return;
+    }
+    setEnviando(true);
+    await new Promise(r => setTimeout(r, 1200));
+    const horaFin = `${String(Number(datos.sel.slot.hora.slice(0, 2)) + 1).padStart(2, "0")}:00`;
+    const reserva = agregarReserva({
+      canchaId: datos.sel.cancha.id,
+      canchaNombre: datos.sel.cancha.nombre,
+      complejoNombre: nombreComplejo(datos.sel.cancha.complejoId),
+      jugador: user?.name || "Jugador",
+      fechaInicio: `${datos.sel.fecha}T${datos.sel.slot.hora}`,
+      fechaFin: `${datos.sel.fecha}T${horaFin}`,
+      precio: total,
+      estado: "PENDIENTE",
+      metodoPago: met,
+      extras: datos.extras,
+    });
+    toast.success("Comprobante recibido. Lo validaremos en máximo 30 minutos.");
+    nav("/jugador/confirmacion", { state: { reserva, pendiente: true } });
   };
 
   return (
     <div className="max-w-2xl mx-auto">
       <Card className="p-6">
         <h1 className="text-2xl font-bold mb-1">Subir comprobante de pago</h1>
-        <p className="text-sm text-muted-foreground mb-6">Los pagos manuales se validan en máximo 30 minutos.</p>
+        <p className="text-sm text-muted-foreground mb-6">
+          Tu horario sigue bloqueado. Validamos los pagos manuales en máximo 30 minutos y te avisaremos del resultado.
+        </p>
+
+        <div className="p-3 mb-5 bg-muted rounded-lg text-sm flex justify-between">
+          <span>{datos.sel.cancha.nombre} · {datos.sel.slot.hora}</span>
+          <span className="font-bold">Total: S/ {total}</span>
+        </div>
+
         <form onSubmit={enviar} className="space-y-4">
-          <div>
-            <Label>Método</Label>
+          <div className="space-y-1.5">
+            <Label htmlFor="metodo">Método de pago usado</Label>
             <Select value={met} onValueChange={setMet}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="Yape">Yape</SelectItem><SelectItem value="Transferencia">Transferencia</SelectItem></SelectContent>
+              <SelectTrigger id="metodo"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Yape">Yape</SelectItem>
+                <SelectItem value="Transferencia">Transferencia</SelectItem>
+              </SelectContent>
             </Select>
           </div>
+
           <div className="grid grid-cols-2 gap-3">
-            <div><Label>Monto pagado (S/)</Label><Input type="number" defaultValue={total} required /></div>
-            <div><Label>Nº referencia / operación</Label><Input placeholder="000123456" required /></div>
+            <div className="space-y-1.5">
+              <Label htmlFor="monto">Monto pagado (S/)</Label>
+              <Input id="monto" type="number" min={1} step="0.01" value={monto} onChange={e => setMonto(e.target.value)} required />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ref">Nº de operación</Label>
+              <Input id="ref" placeholder="Ej. 000123456" value={referencia} onChange={e => setReferencia(e.target.value)} required />
+            </div>
           </div>
-          <div>
-            <Label>Imagen del comprobante</Label>
-            <div className="border-2 border-dashed rounded-lg p-6 text-center hover:bg-muted/40 transition cursor-pointer">
+
+          {montoDistinto && (
+            <p role="alert" className="text-xs flex items-start gap-2 bg-warning/10 text-foreground p-3 rounded-md">
+              <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+              El monto ingresado (S/ {montoNum}) no coincide con el total de tu reserva (S/ {total}). Si pagaste un monto distinto, la validación podría rechazarse.
+            </p>
+          )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="file">Imagen del comprobante</Label>
+            <div className="border-2 border-dashed rounded-lg p-6 text-center hover:bg-muted/40 transition-colors cursor-pointer">
               <input id="file" type="file" accept="image/*" onChange={handleFile} className="hidden" />
-              <label htmlFor="file" className="cursor-pointer">
+              <label htmlFor="file" className="cursor-pointer block">
                 {preview ? (
-                  <img src={preview} alt="Comprobante" className="max-h-64 mx-auto rounded-md" />
+                  <div className="space-y-2">
+                    <img src={preview} alt="Vista previa del comprobante subido" className="max-h-64 mx-auto rounded-md" />
+                    <span className="text-xs text-accent inline-flex items-center gap-1"><CheckCircle className="w-3.5 h-3.5" />Imagen lista. Click para cambiarla.</span>
+                  </div>
                 ) : (
-                  <div className="text-muted-foreground"><Upload className="w-8 h-8 mx-auto mb-2" />Click para subir imagen</div>
+                  <div className="text-muted-foreground">
+                    <ImageIcon className="w-8 h-8 mx-auto mb-2" />
+                    <div className="text-sm font-medium text-foreground">Click para subir tu comprobante</div>
+                    <div className="text-xs mt-1">JPG o PNG, máximo {MAX_MB} MB</div>
+                  </div>
                 )}
               </label>
             </div>
+            {errorArchivo && (
+              <p role="alert" className="text-xs text-destructive flex items-center gap-1.5">
+                <X className="w-3.5 h-3.5" />{errorArchivo}
+              </p>
+            )}
           </div>
-          <Button type="submit" className="w-full bg-gradient-accent border-0"><CheckCircle className="w-4 h-4 mr-2" />Enviar para validación</Button>
+
+          <Button type="submit" className="w-full bg-gradient-accent border-0" disabled={enviando}>
+            {enviando ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando comprobante…</>) : (<><Upload className="w-4 h-4 mr-2" />Enviar para validación</>)}
+          </Button>
+          <p className="text-xs text-center text-muted-foreground">
+            Al enviarlo, tu reserva quedará <b>pendiente de validación</b>. Te notificaremos al confirmarse.
+          </p>
         </form>
       </Card>
     </div>
