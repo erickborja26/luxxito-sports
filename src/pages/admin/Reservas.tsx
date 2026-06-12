@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { canchas, Reserva, reservasMock } from "@/data/mock";
+import { canchas, nombreComplejo, Reserva, reservasMock } from "@/data/mock";
 
 type BlockForm = { canchaId: string; date: string; start: string; end: string; reason: string };
 
@@ -91,7 +91,7 @@ export default function ReservasAdmin() {
       id: `BLQ-${String(reservations.length + 1).padStart(3, "0")}`,
       canchaId: blockForm.canchaId,
       canchaNombre: court?.nombre ?? "Cancha",
-      complejoNombre: "Luxxito San Borja",
+      complejoNombre: nombreComplejo(court?.complejoId ?? "c1"),
       jugador: `Bloqueo: ${blockForm.reason}`,
       fechaInicio: `${blockForm.date}T${blockForm.start}`,
       fechaFin: `${blockForm.date}T${blockForm.end}`,

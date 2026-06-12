@@ -8,7 +8,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { extrasMock, Cancha } from "@/data/mock";
+import { extrasMock, Cancha, nombreComplejo } from "@/data/mock";
 import { useReservas, ExtraReservado } from "@/context/ReservasContext";
 import { useAuth } from "@/context/AuthContext";
 import { AlertTriangle, ArrowLeft, Check, CreditCard, Smartphone, Upload, Clock, Loader2, Plus, Minus, ShoppingCart } from "lucide-react";
@@ -95,7 +95,7 @@ export default function Reservar() {
     return agregarReserva({
       canchaId: sel.cancha.id,
       canchaNombre: sel.cancha.nombre,
-      complejoNombre: sel.cancha.complejoId === "c1" ? "Luxxito San Borja" : sel.cancha.complejoId === "c2" ? "Luxxito Miraflores" : "Luxxito Surco",
+      complejoNombre: nombreComplejo(sel.cancha.complejoId),
       jugador: user?.name || "Jugador",
       fechaInicio: `${sel.fecha}T${sel.slot.hora}`,
       fechaFin: `${sel.fecha}T${horaFin}`,
@@ -137,17 +137,17 @@ export default function Reservar() {
         aria-label={`Tiempo restante del bloqueo: ${mm} minutos ${ss} segundos`}
         className={cn(
           "rounded-xl p-4 space-y-2",
-          urgente ? "bg-destructive text-destructive-foreground animate-pulse-glow" : "bg-warning/15"
+          urgente ? "bg-destructive text-destructive-foreground animate-pulse-glow" : "bg-slot-locked/15"
         )}
       >
         <div className="flex items-center justify-between gap-3">
-          <div className={cn("flex items-center gap-2 text-sm font-medium", !urgente && "text-warning")}>
+          <div className={cn("flex items-center gap-2 text-sm font-medium", !urgente && "text-slot-locked")}>
             <Clock className="w-4 h-4" />
             {urgente ? "¡Tu bloqueo está por expirar!" : "Horario bloqueado para ti mientras completas el pago"}
           </div>
-          <div className={cn("font-mono text-2xl font-bold tabular-nums", !urgente && "text-warning")}>{mm}:{ss}</div>
+          <div className={cn("font-mono text-2xl font-bold tabular-nums", !urgente && "text-slot-locked")}>{mm}:{ss}</div>
         </div>
-        <Progress value={progreso} className={cn("h-1.5", urgente ? "bg-destructive-foreground/20" : "bg-warning/20")} />
+        <Progress value={progreso} className={cn("h-1.5", urgente ? "bg-destructive-foreground/20" : "bg-slot-locked/20")} />
       </div>
 
       {/* Indicador de pasos */}
