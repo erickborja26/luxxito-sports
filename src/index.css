@@ -45,7 +45,7 @@
 
     /* Estados slot */
     --slot-free: 152 70% 42%;
-    --slot-locked: 32 95% 55%;
+    --slot-locked: 210 90% 55%;  /* "En proceso": azul, para no confundir con las barras de ocupación */
     --slot-booked: 0 75% 55%;
     --slot-maintenance: 215 14% 60%;
 

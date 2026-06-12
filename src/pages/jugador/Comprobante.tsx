@@ -9,7 +9,7 @@ import { Upload, CheckCircle, Loader2, AlertTriangle, ImageIcon, X } from "lucid
 import { toast } from "sonner";
 import { useReservas, ExtraReservado } from "@/context/ReservasContext";
 import { useAuth } from "@/context/AuthContext";
-import { Cancha } from "@/data/mock";
+import { Cancha, nombreComplejo } from "@/data/mock";
 
 type EstadoComprobante = {
   sel: { cancha: Cancha; slot: { hora: string; precio: number }; fecha: string };
@@ -78,7 +78,7 @@ export default function Comprobante() {
     const reserva = agregarReserva({
       canchaId: datos.sel.cancha.id,
       canchaNombre: datos.sel.cancha.nombre,
-      complejoNombre: datos.sel.cancha.complejoId === "c1" ? "Luxxito San Borja" : datos.sel.cancha.complejoId === "c2" ? "Luxxito Miraflores" : "Luxxito Surco",
+      complejoNombre: nombreComplejo(datos.sel.cancha.complejoId),
       jugador: user?.name || "Jugador",
       fechaInicio: `${datos.sel.fecha}T${datos.sel.slot.hora}`,
       fechaFin: `${datos.sel.fecha}T${horaFin}`,

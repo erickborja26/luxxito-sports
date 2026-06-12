@@ -4,8 +4,18 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useReservas } from "@/context/ReservasContext";
-import { Trophy, Calendar, MapPin, Star, Plus, CalendarCheck } from "lucide-react";
-import { CourtLines } from "@/components/SportsBackground";
+import { Calendar, MapPin, Star, Plus, CalendarCheck, Trophy } from "lucide-react";
+import { CourtLines, iconoDeporte, Futbol } from "@/components/SportsBackground";
+import { canchas } from "@/data/mock";
+
+// Borde izquierdo según estado, mismo lenguaje que Mis reservas
+const bordeEstado: Record<string, string> = {
+  CONFIRMADA: "border-l-accent",
+  BLOQUEADA: "border-l-slot-locked",
+  PENDIENTE: "border-l-warning",
+  CANCELADA: "border-l-destructive",
+  VENCIDA: "border-l-muted-foreground",
+};
 
 const scoringStyles: Record<string, { label: string; cls: string }> = {
   nuevo: { label: "Nuevo", cls: "from-slate-400 to-slate-600" },
@@ -52,7 +62,15 @@ export default function JugadorDashboard() {
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div>
-            <h1 className="text-3xl lg:text-4xl font-bold">Hola, {user?.name} 👋</h1>
+            <h1 className="text-3xl lg:text-4xl font-bold">
+              Hola,{" "}
+              <span
+                className="bg-clip-text text-transparent"
+                style={{ backgroundImage: "linear-gradient(135deg, hsl(152 75% 58%), hsl(170 80% 55%))" }}
+              >
+                {user?.name}
+              </span>
+            </h1>
             <p className="text-white/75 mt-1">Tus reservas y horarios favoritos en un solo lugar.</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-2">
@@ -76,13 +94,23 @@ export default function JugadorDashboard() {
           <div className="text-3xl font-bold">{score.label}</div>
           <p className="text-xs text-white/80 mt-1">Seña requerida: {user?.scoring === "nuevo" ? "50%" : "20%"}</p>
         </Card>
-        <Card className="p-5">
-          <div className="text-sm text-muted-foreground mb-1">Próximas reservas</div>
-          <div className="text-3xl font-bold">{proximas.length}</div>
+        <Card className="p-5 transition-shadow duration-200 hover:shadow-elegant">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="w-7 h-7 rounded-lg bg-accent/10 grid place-items-center">
+              <CalendarCheck className="w-4 h-4 text-accent" aria-hidden="true" />
+            </span>
+            <span className="text-sm text-muted-foreground">Próximas reservas</span>
+          </div>
+          <div className="text-3xl font-bold tabular-nums">{proximas.length}</div>
         </Card>
-        <Card className="p-5">
-          <div className="text-sm text-muted-foreground mb-1">Total jugadas</div>
-          <div className="text-3xl font-bold">12</div>
+        <Card className="p-5 transition-shadow duration-200 hover:shadow-elegant">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="w-7 h-7 rounded-lg bg-accent/10 grid place-items-center">
+              <Trophy className="w-4 h-4 text-accent" aria-hidden="true" />
+            </span>
+            <span className="text-sm text-muted-foreground">Total jugadas</span>
+          </div>
+          <div className="text-3xl font-bold tabular-nums">{reservas.length}</div>
         </Card>
       </div>
 
@@ -96,29 +124,34 @@ export default function JugadorDashboard() {
           </Card>
         ) : (
           <div className="grid md:grid-cols-2 gap-4">
-            {proximas.map(r => (
-              <Card key={r.id} className="p-5 hover:shadow-elegant transition-shadow duration-200">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-lg bg-accent/10 grid place-items-center"><Trophy className="w-5 h-5 text-accent" /></div>
-                    <div>
-                      <div className="font-semibold">{r.canchaNombre}</div>
-                      <div className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" />{r.complejoNombre}</div>
+            {proximas.map(r => {
+              const dep = canchas.find(c => c.id === r.canchaId)?.deporte || "Fútbol";
+              const Icono = iconoDeporte[dep] || Futbol;
+              return (
+                <Card key={r.id} className={`p-5 border-l-4 ${bordeEstado[r.estado] || "border-l-border"} hover:shadow-elegant hover:-translate-y-0.5 transition-all duration-200`}>
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-lg bg-accent/10 grid place-items-center"><Icono className="w-8 h-8" /></div>
+                      <div>
+                        <div className="font-semibold">{r.canchaNombre}</div>
+                        <div className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="w-3 h-3" aria-hidden="true" />{r.complejoNombre}</div>
+                      </div>
                     </div>
+                    <StatusBadge status={r.estado} label={etiquetaEstado[r.estado]} />
                   </div>
-                  <StatusBadge status={r.estado} label={etiquetaEstado[r.estado]} />
-                </div>
-                <div className="text-sm text-muted-foreground flex items-center gap-2 mb-3">
-                  <Calendar className="w-4 h-4" />{new Date(r.fechaInicio).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" })}
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-lg">S/ {r.precio}</span>
-                  <Link to="/jugador/confirmacion" state={{ reserva: r, pendiente: r.estado === "PENDIENTE" }}>
-                    <Button variant="outline" size="sm">Ver detalle</Button>
-                  </Link>
-                </div>
-              </Card>
-            ))}
+                  <div className="text-sm text-muted-foreground flex items-center gap-2 mb-3">
+                    <Calendar className="w-4 h-4" aria-hidden="true" />
+                    <span className="capitalize">{new Date(r.fechaInicio).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" })}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-lg">S/ {r.precio}</span>
+                    <Link to="/jugador/confirmacion" state={{ reserva: r, pendiente: r.estado === "PENDIENTE" }}>
+                      <Button variant="outline" size="sm">Ver detalle</Button>
+                    </Link>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         )}
       </section>
@@ -129,15 +162,24 @@ export default function JugadorDashboard() {
           <Card className="p-6 text-center text-sm text-muted-foreground">Tu historial está vacío.</Card>
         ) : (
           <Card className="divide-y">
-            {historial.map(r => (
-              <div key={r.id} className="p-4 flex items-center justify-between">
-                <div>
-                  <div className="font-medium">{r.canchaNombre} · {r.complejoNombre}</div>
-                  <div className="text-xs text-muted-foreground">{new Date(r.fechaInicio).toLocaleString("es-PE")}</div>
+            {historial.map(r => {
+              const dep = canchas.find(c => c.id === r.canchaId)?.deporte || "Fútbol";
+              const Icono = iconoDeporte[dep] || Futbol;
+              return (
+                <div key={r.id} className="p-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-lg bg-muted grid place-items-center shrink-0 opacity-70">
+                      <Icono className="w-6 h-6" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{r.canchaNombre} · {r.complejoNombre}</div>
+                      <div className="text-xs text-muted-foreground">{new Date(r.fechaInicio).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" })}</div>
+                    </div>
+                  </div>
+                  <StatusBadge status={r.estado} label={etiquetaEstado[r.estado]} className="shrink-0" />
                 </div>
-                <StatusBadge status={r.estado} label={etiquetaEstado[r.estado]} />
-              </div>
-            ))}
+              );
+            })}
           </Card>
         )}
       </section>

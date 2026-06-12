@@ -149,7 +149,7 @@ export default function Confirmacion() {
             <div>
               <div className="text-lg font-bold leading-tight">{reserva?.canchaNombre || "Cancha 1"}</div>
               <div className="text-xs text-muted-foreground flex items-center gap-1">
-                <MapPin className="w-3 h-3" />{reserva?.complejoNombre || "Luxxito San Borja"}
+                <MapPin className="w-3 h-3" />{reserva?.complejoNombre || "Mundialitos Club"}
               </div>
             </div>
             <span className="font-mono text-xs font-bold bg-muted rounded-lg px-3 py-1.5">{codigo}</span>
