@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from "react-router-dom";
 import { useAuth, Role } from "@/context/AuthContext";
 import {
   LayoutDashboard, Calendar, Trophy,
-  BarChart3, LogOut, Menu, X, Building2, Activity, DollarSign, Package, Receipt
+  BarChart3, LogOut, Menu, X, Building2, Activity, DollarSign, Package, Receipt, User
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
@@ -203,8 +203,8 @@ export default function AppLayout() {
               <div className="font-medium leading-tight">{user.name}</div>
               <div className="text-xs text-muted-foreground">{user.email}</div>
             </div>
-            <div className="w-9 h-9 rounded-full bg-gradient-accent grid place-items-center text-accent-foreground font-semibold">
-              {user.name[0]?.toUpperCase()}
+            <div className="w-9 h-9 rounded-full bg-gradient-accent grid place-items-center text-accent-foreground">
+              <User className="w-4 h-4" aria-hidden="true" />
             </div>
           </div>
         </header>
