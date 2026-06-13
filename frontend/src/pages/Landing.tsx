@@ -1,13 +1,27 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Trophy, Search, Shield, Clock, Bell, Zap, CheckCircle2, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import hero from "@/assets/hero-field.jpg";
-import { complejos, deportes } from "@/data/mock";
+import { api, Paginated, unwrap } from "@/lib/api";
+import { Complejo, Deporte } from "@/lib/domain";
 
 export default function Landing() {
+  const [complejos, setComplejos] = useState<Complejo[]>([]);
+  const [deportes, setDeportes] = useState<Deporte[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      api<Paginated<Complejo> | Complejo[]>("/complejos/?page_size=20"),
+      api<Deporte[]>("/deportes/"),
+    ]).then(([complexes, sports]) => {
+      setComplejos(unwrap(complexes));
+      setDeportes(sports);
+    }).catch(() => undefined);
+  }, []);
   return (
     <div className="min-h-screen bg-background">
       {/* Nav */}
@@ -67,7 +81,7 @@ export default function Landing() {
         <Card className="p-6 shadow-elegant border-0 bg-card/95 backdrop-blur">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
             <Select><SelectTrigger><SelectValue placeholder="Deporte" /></SelectTrigger>
-              <SelectContent>{deportes.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
+              <SelectContent>{deportes.map(d => <SelectItem key={d.id} value={String(d.id)}>{d.nombre}</SelectItem>)}</SelectContent>
             </Select>
             <Select><SelectTrigger><SelectValue placeholder="Complejo" /></SelectTrigger>
               <SelectContent>{complejos.map(c => <SelectItem key={c.id} value={c.id}>{c.nombre}</SelectItem>)}</SelectContent>

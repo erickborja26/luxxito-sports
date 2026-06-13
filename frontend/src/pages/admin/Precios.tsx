@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Info, Plus, Trash2, TrendingDown, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -9,32 +9,51 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { canchas, ReglaPrecio, reglasPrecioMock } from "@/data/mock";
+import { api, Paginated, unwrap } from "@/lib/api";
+import { Cancha, mapCourt, ReglaPrecio } from "@/lib/domain";
 
-type PriceRule = ReglaPrecio & { activo: boolean; nombre: string };
-type PriceForm = Omit<PriceRule, "id" | "activo">;
+type PriceForm = Omit<ReglaPrecio, "id" | "activo">;
 
 const days = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
-const initialRules: PriceRule[] = reglasPrecioMock.map((rule, index) => ({
-  ...rule,
-  activo: true,
-  nombre: index === 0 ? "Hora pico nocturna" : index === 1 ? "Fin de semana" : "Promoción lunes",
-}));
-
 export default function Precios() {
-  const [rules, setRules] = useState<PriceRule[]>(initialRules);
-  const [deleteTarget, setDeleteTarget] = useState<PriceRule | null>(null);
+  const [rules, setRules] = useState<ReglaPrecio[]>([]);
+  const [canchas, setCanchas] = useState<Cancha[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<ReglaPrecio | null>(null);
   const [form, setForm] = useState<PriceForm>({
     nombre: "",
-    canchaId: canchas[0].id,
-    diaSemana: "Viernes",
+    canchaId: "",
+    diaSemana: 5,
     horaInicio: "18:00",
     horaFin: "22:00",
     tarifa: 150,
   });
 
-  const addRule = () => {
+  const load = async () => {
+    const [rulesData, courtsData] = await Promise.all([
+      api<Paginated<any> | any[]>("/reglas-precio/?page_size=100"),
+      api<Paginated<any> | any[]>("/canchas/?page_size=100"),
+    ]);
+    const courtList = unwrap(courtsData).map(mapCourt);
+    setCanchas(courtList);
+    setRules(unwrap(rulesData).map((item: any) => ({
+      id: item.id,
+      canchaId: item.cancha_id,
+      nombre: item.nombre,
+      diaSemana: item.dia_semana,
+      horaInicio: item.hora_inicio,
+      horaFin: item.hora_fin,
+      tarifa: Number(item.monto_hora),
+      activo: item.activa,
+    })));
+    if (!form.canchaId && courtList.length) setForm((current) => ({ ...current, canchaId: courtList[0].id }));
+  };
+
+  useEffect(() => {
+    load().catch((error) => toast.error(error.message));
+  }, []);
+
+  const addRule = async () => {
     if (!form.nombre.trim()) {
       toast.error("Escribe un nombre para identificar la regla.");
       return;
@@ -58,9 +77,25 @@ export default function Precios() {
       toast.error("Ya existe una regla activa que se cruza con ese horario.");
       return;
     }
-    setRules((current) => [...current, { ...form, id: crypto.randomUUID(), activo: true }]);
-    setForm((current) => ({ ...current, nombre: "" }));
-    toast.success("Regla de precio creada.");
+    try {
+      await api("/reglas-precio/", {
+        method: "POST",
+        body: JSON.stringify({
+          cancha_id: form.canchaId,
+          nombre: form.nombre,
+          dia_semana: form.diaSemana,
+          hora_inicio: form.horaInicio,
+          hora_fin: form.horaFin,
+          monto_hora: form.tarifa,
+          activa: true,
+        }),
+      });
+      await load();
+      setForm((current) => ({ ...current, nombre: "" }));
+      toast.success("Regla de precio creada.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo crear la regla");
+    }
   };
 
   return (
@@ -82,7 +117,7 @@ export default function Precios() {
           <div className="space-y-4">
             <div><Label htmlFor="rule-name">Nombre de la regla</Label><Input id="rule-name" placeholder="Ej. Hora valle mañanas" value={form.nombre} onChange={(event) => setForm({ ...form, nombre: event.target.value })} /></div>
             <div><Label>Cancha</Label><Select value={form.canchaId} onValueChange={(value) => setForm({ ...form, canchaId: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{canchas.map((court) => <SelectItem key={court.id} value={court.id}>{court.nombre}</SelectItem>)}</SelectContent></Select></div>
-            <div><Label>Día de la semana</Label><Select value={form.diaSemana} onValueChange={(value) => setForm({ ...form, diaSemana: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{days.map((day) => <SelectItem key={day} value={day}>{day}</SelectItem>)}</SelectContent></Select></div>
+            <div><Label>Día de la semana</Label><Select value={String(form.diaSemana)} onValueChange={(value) => setForm({ ...form, diaSemana: Number(value) })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{days.map((day, index) => <SelectItem key={day} value={String(index + 1)}>{day}</SelectItem>)}</SelectContent></Select></div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Desde</Label><Input type="time" value={form.horaInicio} onChange={(event) => setForm({ ...form, horaInicio: event.target.value })} /></div>
               <div><Label>Hasta</Label><Input type="time" value={form.horaFin} onChange={(event) => setForm({ ...form, horaFin: event.target.value })} /></div>
@@ -110,7 +145,7 @@ export default function Precios() {
                       <div>
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="font-medium">{rule.nombre}</span>
-                          <Badge variant="outline">{rule.diaSemana}</Badge>
+                          <Badge variant="outline">{days[rule.diaSemana - 1]}</Badge>
                         </div>
                         <div className="mt-1 text-sm text-muted-foreground">{court?.nombre} · {rule.horaInicio} - {rule.horaFin}</div>
                       </div>
@@ -122,7 +157,14 @@ export default function Precios() {
                           </div>
                           <div className="text-xs text-muted-foreground">Base S/ {baseRate}</div>
                         </div>
-                        <Switch checked={rule.activo} onCheckedChange={(checked) => setRules((current) => current.map((item) => item.id === rule.id ? { ...item, activo: checked } : item))} aria-label={`Activar regla ${rule.nombre}`} />
+                        <Switch checked={rule.activo} onCheckedChange={async (checked) => {
+                          try {
+                            await api(`/reglas-precio/${rule.id}/`, { method: "PATCH", body: JSON.stringify({ activa: checked }) });
+                            setRules((current) => current.map((item) => item.id === rule.id ? { ...item, activo: checked } : item));
+                          } catch (error) {
+                            toast.error(error instanceof Error ? error.message : "No se pudo actualizar");
+                          }
+                        }} aria-label={`Activar regla ${rule.nombre}`} />
                         <Button size="icon" variant="ghost" aria-label={`Eliminar regla ${rule.nombre}`} onClick={() => setDeleteTarget(rule)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                       </div>
                     </div>
@@ -140,7 +182,17 @@ export default function Precios() {
           <p className="text-sm text-muted-foreground">La franja volverá a utilizar la tarifa estándar de la cancha. ¿Deseas eliminar <strong>{deleteTarget?.nombre}</strong>?</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={() => { if (deleteTarget) setRules((current) => current.filter((rule) => rule.id !== deleteTarget.id)); setDeleteTarget(null); toast.success("Regla eliminada."); }}>Eliminar regla</Button>
+            <Button variant="destructive" onClick={async () => {
+              if (!deleteTarget) return;
+              try {
+                await api(`/reglas-precio/${deleteTarget.id}/`, { method: "DELETE" });
+                setRules((current) => current.filter((rule) => rule.id !== deleteTarget.id));
+                setDeleteTarget(null);
+                toast.success("Regla eliminada.");
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "No se pudo eliminar");
+              }
+            }}>Eliminar regla</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

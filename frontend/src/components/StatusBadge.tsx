@@ -20,8 +20,7 @@ const statusMap: Record<string, StatusConfig> = {
   },
   BLOQUEADA: {
     label: "Bloqueada",
-    // Azul: coherente con el estado "En proceso" de la grilla de disponibilidad
-    className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border border-blue-300 dark:border-blue-700",
+    className: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 border border-orange-300 dark:border-orange-700",
     icon: (
       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
         <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
@@ -123,8 +122,6 @@ const statusMap: Record<string, StatusConfig> = {
 
 interface StatusBadgeProps {
   status: string;
-  /** Texto alternativo al label por defecto del estado (ej. "En proceso de pago") */
-  label?: string;
   className?: string;
 }
 
@@ -138,8 +135,9 @@ interface StatusBadgeProps {
  * - No depende solo del color (WCAG compliant)
  * - Aria-label para contexto adicional
  */
-export const StatusBadge = ({ status, label, className }: StatusBadgeProps) => {
-  const config = statusMap[status] || {
+export const StatusBadge = ({ status, className }: StatusBadgeProps) => {
+  const normalizedStatus = status === "DANADO" ? "DAÑADO" : status;
+  const config = statusMap[normalizedStatus] || {
     label: status,
     className: "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600",
     icon: (
@@ -164,7 +162,7 @@ export const StatusBadge = ({ status, label, className }: StatusBadgeProps) => {
       <span className="flex-shrink-0" aria-hidden="true">
         {config.icon}
       </span>
-      <span>{label ?? config.label}</span>
+      <span>{config.label}</span>
     </span>
   );
 };

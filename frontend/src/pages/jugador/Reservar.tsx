@@ -8,9 +8,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { extrasMock, Cancha, nombreComplejo } from "@/data/mock";
-import { useReservas, ExtraReservado } from "@/context/ReservasContext";
-import { useAuth } from "@/context/AuthContext";
+import { api, Paginated, unwrap } from "@/lib/api";
+import { Cancha, Extra, ExtraReservado, mapExtra, mapReservation } from "@/lib/domain";
 import { AlertTriangle, ArrowLeft, Check, CreditCard, Smartphone, Upload, Clock, Loader2, Plus, Minus, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -18,19 +17,19 @@ import { cn } from "@/lib/utils";
 const steps = ["Horario", "Extras", "Pago"];
 const HOLD_SECONDS = 20 * 60;
 
-type Slot = { hora: string; precio: number };
+type Slot = { hora: string; horaFin: string; precio: number };
 type Seleccion = { cancha: Cancha; slot: Slot; fecha: string };
 
 export default function Reservar() {
   const loc = useLocation();
   const nav = useNavigate();
-  const { user } = useAuth();
-  const { agregarReserva } = useReservas();
   const sel = loc.state as Seleccion | null;
 
   const [step, setStep] = useState(0);
   const [seconds, setSeconds] = useState(HOLD_SECONDS);
   const [extras, setExtras] = useState<Record<string, number>>({});
+  const [extrasDisponibles, setExtrasDisponibles] = useState<Extra[]>([]);
+  const [holdId, setHoldId] = useState<string | null>(null);
   const [metodo, setMetodo] = useState<"Tarjeta" | "Yape" | "Transferencia">("Tarjeta");
   const [pagando, setPagando] = useState(false);
   const [confirmarSalida, setConfirmarSalida] = useState(false);
@@ -42,6 +41,15 @@ export default function Reservar() {
       nav("/jugador/disponibilidad", { replace: true });
     }
   }, [sel, nav]);
+
+  useEffect(() => {
+    if (!sel) return;
+    api<Paginated<any> | any[]>("/extras/?page_size=100")
+      .then((data) => setExtrasDisponibles(
+        unwrap(data).map(mapExtra).filter((extra) => extra.complejoId === sel.cancha.complejoId),
+      ))
+      .catch((error) => toast.error(error.message));
+  }, [sel]);
 
   useEffect(() => {
     const t = setInterval(() => setSeconds(s => Math.max(0, s - 1)), 1000);
@@ -68,10 +76,10 @@ export default function Reservar() {
     () => Object.entries(extras)
       .filter(([, q]) => q > 0)
       .map(([id, cantidad]) => {
-        const e = extrasMock.find(x => x.id === id)!;
-        return { nombre: e.nombre, cantidad, precio: e.precio };
+        const e = extrasDisponibles.find(x => x.id === id)!;
+        return { id: e.id, nombre: e.nombre, cantidad, precio: e.precio };
       }),
-    [extras]
+    [extras, extrasDisponibles]
   );
   const totalExtras = carrito.reduce((acc, e) => acc + e.precio * e.cantidad, 0);
   const precioCancha = sel?.slot.precio ?? 0;
@@ -80,8 +88,8 @@ export default function Reservar() {
   if (!sel) return null;
 
   const cambiarExtra = (id: string, delta: number) => {
-    const e = extrasMock.find(x => x.id === id)!;
-    if (e.estado === "DAÑADO") return toast.error(`"${e.nombre}" no está disponible por mantenimiento.`);
+    const e = extrasDisponibles.find(x => x.id === id)!;
+    if (e.estado === "DANADO") return toast.error(`"${e.nombre}" no está disponible por mantenimiento.`);
     if (e.cantidad === 0) return toast.error(`"${e.nombre}" está agotado por ahora.`);
     const actual = extras[id] || 0;
     if (delta > 0 && actual >= e.cantidad) {
@@ -90,42 +98,69 @@ export default function Reservar() {
     setExtras(p => ({ ...p, [id]: Math.max(0, actual + delta) }));
   };
 
-  const crearReserva = (estado: "CONFIRMADA" | "PENDIENTE") => {
-    const horaFin = `${String(Number(sel.slot.hora.slice(0, 2)) + 1).padStart(2, "0")}:00`;
-    return agregarReserva({
-      canchaId: sel.cancha.id,
-      canchaNombre: sel.cancha.nombre,
-      complejoNombre: nombreComplejo(sel.cancha.complejoId),
-      jugador: user?.name || "Jugador",
-      fechaInicio: `${sel.fecha}T${sel.slot.hora}`,
-      fechaFin: `${sel.fecha}T${horaFin}`,
-      precio: total,
-      estado,
-      metodoPago: metodo,
-      extras: carrito,
+  const crearBloqueo = async () => {
+    if (holdId) return holdId;
+    const hold = await api<any>("/bloqueos/", {
+      method: "POST",
+      body: JSON.stringify({
+        cancha_id: sel.cancha.id,
+        fecha: sel.fecha,
+        hora_inicio: sel.slot.hora,
+        hora_fin: sel.slot.horaFin,
+        extras: carrito.map((item) => ({ extra_id: item.id, cantidad: item.cantidad })),
+      }),
     });
+    setHoldId(hold.id_bloqueo);
+    setSeconds(Math.max(0, Math.floor((new Date(hold.expira_en).getTime() - Date.now()) / 1000)));
+    return hold.id_bloqueo as string;
+  };
+
+  const crearReserva = async () => {
+    const bloqueoId = await crearBloqueo();
+    const data = await api<any>("/reservas/", {
+      method: "POST",
+      body: JSON.stringify({ bloqueo_id: bloqueoId }),
+    });
+    return mapReservation(data);
   };
 
   const pagarAhora = async () => {
     setPagando(true);
-    // Simula el procesamiento del pago y un posible conflicto de concurrencia
-    await new Promise(r => setTimeout(r, 1500));
-    if (Math.random() > 0.9) {
-      setPagando(false);
-      toast.error("El horario seleccionado ya no está disponible. Por favor elige otro.", {
-        description: "Otro jugador completó su reserva antes que tú. No se realizó ningún cobro.",
-        action: { label: "Ver horarios", onClick: () => nav("/jugador/disponibilidad") },
+    try {
+      const reserva = await crearReserva();
+      await api(`/reservas/${reserva.id}/pagos/`, {
+        method: "POST",
+        body: JSON.stringify({
+          metodo: "TARJETA",
+          monto_pagado: total.toFixed(2),
+          referencia: `WEB-${Date.now()}`,
+        }),
       });
-      nav("/jugador/disponibilidad");
-      return;
+      reserva.estado = "CONFIRMADA";
+      reserva.metodoPago = "TARJETA";
+      toast.success("¡Pago aprobado! Tu reserva está confirmada.");
+      nav("/jugador/confirmacion", { state: { reserva } });
+    } catch (error) {
+      setPagando(false);
+      toast.error(error instanceof Error ? error.message : "No se pudo completar el pago");
     }
-    const reserva = crearReserva("CONFIRMADA");
-    toast.success("¡Pago aprobado! Tu reserva está confirmada.");
-    nav("/jugador/confirmacion", { state: { reserva } });
   };
 
-  const irAComprobante = () => {
-    nav("/jugador/comprobante", { state: { sel, total, extras: carrito, metodo } });
+  const irAComprobante = async () => {
+    setPagando(true);
+    try {
+      const reserva = await crearReserva();
+      nav("/jugador/comprobante", { state: { reserva, total, metodo } });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo crear la reserva");
+      setPagando(false);
+    }
+  };
+
+  const cancelarBloqueo = async () => {
+    if (holdId) await api(`/bloqueos/${holdId}/`, { method: "DELETE" }).catch(() => undefined);
+    toast.info("Reserva cancelada. El horario fue liberado.");
+    nav("/jugador/disponibilidad");
   };
 
   return (
@@ -137,17 +172,17 @@ export default function Reservar() {
         aria-label={`Tiempo restante del bloqueo: ${mm} minutos ${ss} segundos`}
         className={cn(
           "rounded-xl p-4 space-y-2",
-          urgente ? "bg-destructive text-destructive-foreground animate-pulse-glow" : "bg-slot-locked/15"
+          urgente ? "bg-destructive text-destructive-foreground animate-pulse-glow" : "bg-warning/15"
         )}
       >
         <div className="flex items-center justify-between gap-3">
-          <div className={cn("flex items-center gap-2 text-sm font-medium", !urgente && "text-slot-locked")}>
+          <div className={cn("flex items-center gap-2 text-sm font-medium", !urgente && "text-warning")}>
             <Clock className="w-4 h-4" />
             {urgente ? "¡Tu bloqueo está por expirar!" : "Horario bloqueado para ti mientras completas el pago"}
           </div>
-          <div className={cn("font-mono text-2xl font-bold tabular-nums", !urgente && "text-slot-locked")}>{mm}:{ss}</div>
+          <div className={cn("font-mono text-2xl font-bold tabular-nums", !urgente && "text-warning")}>{mm}:{ss}</div>
         </div>
-        <Progress value={progreso} className={cn("h-1.5", urgente ? "bg-destructive-foreground/20" : "bg-slot-locked/20")} />
+        <Progress value={progreso} className={cn("h-1.5", urgente ? "bg-destructive-foreground/20" : "bg-warning/20")} />
       </div>
 
       {/* Indicador de pasos */}
@@ -188,8 +223,8 @@ export default function Reservar() {
               )}
             </div>
             <div className="space-y-2">
-              {extrasMock.map(e => {
-                const disabled = e.estado === "DAÑADO" || e.cantidad === 0;
+              {extrasDisponibles.map(e => {
+                const disabled = e.estado === "DANADO" || e.cantidad === 0;
                 const q = extras[e.id] || 0;
                 return (
                   <div key={e.id} className={cn("flex items-center justify-between p-3 border rounded-lg transition-colors", disabled ? "opacity-50" : "hover:border-accent/50")}>
@@ -197,8 +232,8 @@ export default function Reservar() {
                       <div className="font-medium">{e.nombre}</div>
                       <div className="text-xs text-muted-foreground flex items-center gap-2">
                         S/ {e.precio} c/u · Stock: {e.cantidad}
-                        {e.estado === "DAÑADO" && <Badge variant="destructive" className="text-[10px]">No disponible</Badge>}
-                        {e.estado !== "DAÑADO" && e.cantidad === 0 && <Badge variant="destructive" className="text-[10px]">Agotado</Badge>}
+                        {e.estado === "DANADO" && <Badge variant="destructive" className="text-[10px]">No disponible</Badge>}
+                        {e.estado !== "DANADO" && e.cantidad === 0 && <Badge variant="destructive" className="text-[10px]">Agotado</Badge>}
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -290,7 +325,7 @@ export default function Reservar() {
             <AlertDialogCancel>Seguir reservando</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => { toast.info("Reserva cancelada. El horario fue liberado."); nav("/jugador/disponibilidad"); }}
+              onClick={cancelarBloqueo}
             >
               Sí, cancelar
             </AlertDialogAction>

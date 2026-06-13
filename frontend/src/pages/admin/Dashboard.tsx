@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -25,28 +26,45 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StatusBadge } from "@/components/StatusBadge";
-import { canchas, comprobantesMock, reservasMock } from "@/data/mock";
-
-const ocupacionSemanal = [
-  { dia: "Lun", ocupacion: 54, ingresos: 1380 },
-  { dia: "Mar", ocupacion: 61, ingresos: 1640 },
-  { dia: "Mié", ocupacion: 58, ingresos: 1510 },
-  { dia: "Jue", ocupacion: 72, ingresos: 2180 },
-  { dia: "Vie", ocupacion: 88, ingresos: 2940 },
-  { dia: "Sáb", ocupacion: 93, ingresos: 3420 },
-  { dia: "Dom", ocupacion: 79, ingresos: 2640 },
-];
-
-const kpis = [
-  { label: "Ocupación hoy", value: "78%", change: "+6% vs. ayer", icon: Activity, tone: "text-accent bg-accent/10" },
-  { label: "Ingresos hoy", value: "S/ 2,840", change: "+12% vs. ayer", icon: DollarSign, tone: "text-info bg-info/10" },
-  { label: "Reservas activas", value: "24", change: "12 próximas", icon: Calendar, tone: "text-warning bg-warning/10" },
-  { label: "Pagos por validar", value: String(comprobantesMock.length), change: "Atender antes de 30 min", icon: Receipt, tone: "text-destructive bg-destructive/10" },
-];
+import { api, Paginated, unwrap } from "@/lib/api";
+import { Cancha, mapCourt, mapPayment, mapReservation, Pago, ReservaJugador } from "@/lib/domain";
 
 export default function AdminDashboard() {
-  const reservasProximas = reservasMock.filter((reserva) => reserva.estado !== "CANCELADA").slice(0, 4);
+  const [canchas, setCanchas] = useState<Cancha[]>([]);
+  const [reservas, setReservas] = useState<ReservaJugador[]>([]);
+  const [comprobantes, setComprobantes] = useState<Pago[]>([]);
+  const [report, setReport] = useState<any>({});
+  const [ocupacionSemanal, setOcupacionSemanal] = useState<any[]>([]);
+
+  useEffect(() => {
+    Promise.all([
+      api<Paginated<any> | any[]>("/canchas/?page_size=100"),
+      api<Paginated<any> | any[]>("/reservas/?page_size=100"),
+      api<Paginated<any> | any[]>("/pagos/pendientes/?page_size=100"),
+      api<any>("/reportes/kpis/"),
+      api<any[]>("/reportes/ingresos/"),
+    ]).then(([courts, reservations, payments, kpis, incomeRows]) => {
+      setCanchas(unwrap(courts).map(mapCourt));
+      setReservas(unwrap(reservations).map(mapReservation));
+      setComprobantes(unwrap(payments).map(mapPayment));
+      setReport(kpis);
+      const maxIncome = Math.max(1, ...incomeRows.map((row) => Number(row.ingresos)));
+      setOcupacionSemanal(incomeRows.map((row) => ({
+        dia: row.reservation__scheduled_date,
+        ingresos: Number(row.ingresos),
+        ocupacion: Math.round(Number(row.ingresos) / maxIncome * 100),
+      })));
+    }).catch(() => undefined);
+  }, []);
+
+  const reservasProximas = reservas.filter((reserva) => reserva.estado !== "CANCELADA").slice(0, 4);
   const canchasActivas = canchas.filter((cancha) => cancha.activo).length;
+  const kpis = [
+    { label: "Reservas confirmadas", value: String(report.reservas_confirmadas ?? 0), change: `${report.reservas_totales ?? 0} reservas totales`, icon: Activity, tone: "text-accent bg-accent/10" },
+    { label: "Ingresos del periodo", value: `S/ ${Number(report.ingresos ?? 0).toFixed(2)}`, change: "Pagos aprobados", icon: DollarSign, tone: "text-info bg-info/10" },
+    { label: "Reservas activas", value: String(reservas.filter((item) => ["CONFIRMADA", "PENDIENTE"].includes(item.estado)).length), change: "Agenda actual", icon: Calendar, tone: "text-warning bg-warning/10" },
+    { label: "Pagos por validar", value: String(comprobantes.length), change: "Atender antes de 30 min", icon: Receipt, tone: "text-destructive bg-destructive/10" },
+  ];
 
   return (
     <div className="space-y-6">
@@ -150,7 +168,7 @@ export default function AdminDashboard() {
               <Button asChild size="sm"><Link to="/admin/pagos">Abrir bandeja de validación</Link></Button>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              {comprobantesMock.map((comprobante) => {
+              {comprobantes.map((comprobante) => {
                 const coincide = comprobante.monto === comprobante.montoEsperado;
                 return (
                   <div key={comprobante.id} className="rounded-xl border p-4">

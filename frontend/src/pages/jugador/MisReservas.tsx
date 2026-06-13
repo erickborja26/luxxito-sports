@@ -9,9 +9,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useReservas, ReservaJugador } from "@/context/ReservasContext";
-import { canchas } from "@/data/mock";
-import { Futbol, iconoDeporte, TicketIcon } from "@/components/SportsBackground";
-import { MapPin, Plus, XCircle, QrCode, CalendarX2, Info, Timer } from "lucide-react";
+import { Futbol, Tenis, Basquet, Voley, Padel } from "@/components/SportsBackground";
+import { MapPin, Plus, XCircle, QrCode, CalendarX2, Info } from "lucide-react";
 import { toast } from "sonner";
 
 // Etiquetas humanas para los estados internos
@@ -25,18 +24,18 @@ const etiquetaEstado: Record<string, string> = {
 
 const bordeEstado: Record<string, string> = {
   CONFIRMADA: "border-l-accent",
-  BLOQUEADA: "border-l-slot-locked", // azul: coherente con "En proceso" en disponibilidad
+  BLOQUEADA: "border-l-warning",
   PENDIENTE: "border-l-warning",
   CANCELADA: "border-l-destructive",
   VENCIDA: "border-l-muted-foreground",
 };
 
-// Cuenta regresiva legible para reservas próximas
-const tiempoRestante = (horas: number) => {
-  if (horas <= 0) return null;
-  if (horas < 1) return "¡Empieza pronto!";
-  if (horas < 24) return `En ${Math.round(horas)} h`;
-  return `En ${Math.round(horas / 24)} ${Math.round(horas / 24) === 1 ? "día" : "días"}`;
+const iconoDeporte: Record<string, ({ className }: { className?: string }) => JSX.Element> = {
+  "Fútbol": Futbol,
+  "Tenis": Tenis,
+  "Básquet": Basquet,
+  "Vóley": Voley,
+  "Pádel": Padel,
 };
 
 const esActiva = (r: ReservaJugador) => ["CONFIRMADA", "BLOQUEADA", "PENDIENTE"].includes(r.estado);
@@ -58,39 +57,40 @@ export default function MisReservas() {
     [reservas]
   );
 
-  const confirmarCancelacion = () => {
+  const confirmarCancelacion = async () => {
     if (!aCancelar) return;
-    cancelarReserva(aCancelar.id);
-    const gratuita = horasParaInicio(aCancelar) >= 24;
-    toast.success(`Reserva ${aCancelar.codigo} cancelada.`, {
-      description: gratuita
-        ? "Cancelaste con más de 24 horas de anticipación: el reembolso es total."
-        : "Por cancelar con menos de 24 horas, se retiene la seña según la política.",
-    });
-    setACancelar(null);
+    try {
+      await cancelarReserva(aCancelar.id);
+      const gratuita = horasParaInicio(aCancelar) >= 24;
+      toast.success(`Reserva ${aCancelar.codigo} cancelada.`, {
+        description: gratuita
+          ? "Cancelaste con más de 24 horas de anticipación: el reembolso es total."
+          : "Por cancelar con menos de 24 horas, se retiene la seña según la política.",
+      });
+      setACancelar(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo cancelar la reserva");
+    }
   };
 
   const TarjetaReserva = ({ r }: { r: ReservaJugador }) => {
     const horas = horasParaInicio(r);
     const cancelable = esActiva(r) && horas > 0;
     const inicio = new Date(r.fechaInicio);
-    const deporte = canchas.find(c => c.id === r.canchaId)?.deporte || "Fútbol";
-    const Icono = iconoDeporte[deporte] || Futbol;
-    const restante = esActiva(r) ? tiempoRestante(horas) : null;
+    const Icono = Futbol;
     return (
       <Card className={`overflow-hidden rounded-2xl border-l-4 ${bordeEstado[r.estado] || "border-l-border"} transition-all duration-200 hover:shadow-elegant hover:-translate-y-0.5`}>
         <div className="flex">
-          {/* Tile de fecha: fondo neutro del tema, sin colores de estado para no confundir */}
-          <div className="w-20 sm:w-24 shrink-0 flex flex-col items-center justify-center gap-0.5 py-4 px-2 bg-muted/60 border-r">
-            <TicketIcon className="w-10 h-10 mb-0.5" aria-hidden="true" />
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+          {/* Tile de fecha estilo calendario */}
+          <div className="w-20 sm:w-24 shrink-0 bg-gradient-hero text-white flex flex-col items-center justify-center py-4 px-2">
+            <span className="text-[10px] uppercase tracking-wider opacity-75">
               {inicio.toLocaleDateString("es-PE", { weekday: "short" })}
             </span>
-            <span className="text-2xl font-bold leading-none tabular-nums">{inicio.getDate()}</span>
-            <span className="text-[10px] uppercase text-muted-foreground">
+            <span className="text-2xl sm:text-3xl font-bold leading-tight">{inicio.getDate()}</span>
+            <span className="text-[11px] uppercase opacity-75">
               {inicio.toLocaleDateString("es-PE", { month: "short" })}
             </span>
-            <span className="mt-1 text-[10px] font-semibold text-accent bg-accent/10 rounded-full px-1.5 py-0.5 leading-none">
+            <span className="mt-1.5 text-xs font-semibold bg-white/15 rounded-full px-2 py-0.5">
               {inicio.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}
             </span>
           </div>
@@ -102,24 +102,16 @@ export default function MisReservas() {
                   <Icono className="w-6 h-6" />
                 </div>
                 <div className="min-w-0">
-                  <div className="font-semibold truncate">{r.complejoNombre}</div>
+                  <div className="font-semibold truncate">{r.canchaNombre}</div>
                   <div className="text-xs text-muted-foreground flex items-center gap-1 truncate">
-                    <MapPin className="w-3 h-3 shrink-0" />{r.canchaNombre}
+                    <MapPin className="w-3 h-3 shrink-0" />{r.complejoNombre}
                   </div>
                 </div>
               </div>
               <StatusBadge status={r.estado} label={etiquetaEstado[r.estado]} className="shrink-0" />
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 mb-1">
-              <span className="text-xs font-mono text-muted-foreground">{r.codigo}</span>
-              {restante && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-accent bg-accent/10 border border-accent/25 rounded-full px-2 py-0.5">
-                  <Timer className="w-2.5 h-2.5" aria-hidden="true" />
-                  {restante}
-                </span>
-              )}
-            </div>
+            <div className="text-xs font-mono text-muted-foreground mb-1">{r.codigo}</div>
             {r.extras && r.extras.length > 0 && (
               <div className="text-xs text-muted-foreground truncate">
                 Extras: {r.extras.map(e => `${e.nombre} ×${e.cantidad}`).join(", ")}

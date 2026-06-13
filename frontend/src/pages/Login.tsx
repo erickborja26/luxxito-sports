@@ -25,22 +25,27 @@ export default function Login() {
   const { login } = useAuth();
   const nav = useNavigate();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("Demo1234!");
   const [role, setRole] = useState<Role>("jugador");
   const [verPass, setVerPass] = useState(false);
   const [cargando, setCargando] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) return toast.error("Ingresa tu correo");
-    const gmailRegex = /^[^\s@]+@gmail\.com$/i;
-    if (!gmailRegex.test(email.trim())) {
-      return toast.error("Solo se permiten correos @gmail.com");
-    }
+    if (!email || !password) return toast.error("Ingresa tu correo y contraseña");
     setCargando(true);
-    await new Promise(r => setTimeout(r, 700));
-    login(email.trim().toLowerCase(), role);
-    toast.success("Bienvenido a LuxxitoSports");
-    nav(role === "admin" ? "/admin" : role === "soporte" ? "/soporte" : "/jugador");
+    try {
+      const authenticated = await login(email, password);
+      if (authenticated.role !== role) {
+        toast.info(`La cuenta corresponde al rol ${authenticated.role}.`);
+      }
+      toast.success("Bienvenido a LuxxitoSports");
+      nav(authenticated.role === "admin" ? "/admin" : authenticated.role === "soporte" ? "/soporte" : "/jugador");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Credenciales inválidas");
+    } finally {
+      setCargando(false);
+    }
   };
 
   return (
@@ -155,7 +160,7 @@ export default function Login() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder="tu@gmail.com"
+                    placeholder="tu@correo.com"
                     className="pl-10 h-11"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -167,7 +172,7 @@ export default function Login() {
                 <Label htmlFor="pass">Contraseña</Label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input id="pass" type={verPass ? "text" : "password"} placeholder="••••••••" defaultValue="demo1234" className="pl-10 pr-11 h-11" />
+                  <Input id="pass" type={verPass ? "text" : "password"} placeholder="Contraseña" value={password} onChange={(e) => setPassword(e.target.value)} className="pl-10 pr-11 h-11" />
                   <button
                     type="button"
                     onClick={() => setVerPass(v => !v)}
@@ -217,7 +222,7 @@ export default function Login() {
           </div>
 
           <p className="text-xs text-center text-muted-foreground mt-4">
-            Demo: ingresa con cualquier correo <span className="font-mono">@gmail.com</span>
+            Usa una cuenta registrada o los usuarios de demostración del README.
           </p>
         </div>
       </div>

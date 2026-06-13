@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, Check, Clock3, Eye, Receipt, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -7,9 +7,10 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Comprobante, comprobantesMock } from "@/data/mock";
+import { api, Paginated, unwrap } from "@/lib/api";
+import { mapPayment, Pago } from "@/lib/domain";
 
-function VoucherPreview({ voucher }: { voucher: Comprobante }) {
+function VoucherPreview({ voucher }: { voucher: Pago }) {
   return (
     <div className="mx-auto w-full max-w-sm overflow-hidden rounded-2xl border bg-white text-slate-900 shadow-elegant">
       <div className="bg-gradient-to-r from-emerald-500 to-cyan-500 p-5 text-white">
@@ -36,29 +37,50 @@ function VoucherPreview({ voucher }: { voucher: Comprobante }) {
 }
 
 export default function Pagos() {
-  const [vouchers, setVouchers] = useState<Comprobante[]>(comprobantesMock);
-  const [preview, setPreview] = useState<Comprobante | null>(null);
-  const [approveTarget, setApproveTarget] = useState<Comprobante | null>(null);
-  const [rejectTarget, setRejectTarget] = useState<Comprobante | null>(null);
+  const [vouchers, setVouchers] = useState<Pago[]>([]);
+  const [preview, setPreview] = useState<Pago | null>(null);
+  const [approveTarget, setApproveTarget] = useState<Pago | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<Pago | null>(null);
   const [reason, setReason] = useState("");
 
-  const approve = () => {
+  const load = () => api<Paginated<any> | any[]>("/pagos/pendientes/?page_size=100")
+    .then((data) => setVouchers(unwrap(data).map(mapPayment)))
+    .catch((error) => toast.error(error.message));
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const approve = async () => {
     if (!approveTarget) return;
-    setVouchers((current) => current.filter((voucher) => voucher.id !== approveTarget.id));
-    setApproveTarget(null);
-    toast.success("Comprobante aprobado. La reserva fue confirmada.");
+    try {
+      await api(`/pagos/${approveTarget.id}/aprobar/`, { method: "POST", body: "{}" });
+      setVouchers((current) => current.filter((voucher) => voucher.id !== approveTarget.id));
+      setApproveTarget(null);
+      toast.success("Comprobante aprobado. La reserva fue confirmada.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo aprobar");
+    }
   };
 
-  const reject = () => {
+  const reject = async () => {
     if (!rejectTarget) return;
     if (reason.trim().length < 8) {
       toast.error("Escribe un motivo de al menos 8 caracteres.");
       return;
     }
-    setVouchers((current) => current.filter((voucher) => voucher.id !== rejectTarget.id));
-    setRejectTarget(null);
-    setReason("");
-    toast.success("Comprobante rechazado. El jugador podrá enviar uno nuevo.");
+    try {
+      await api(`/pagos/${rejectTarget.id}/rechazar/`, {
+        method: "POST",
+        body: JSON.stringify({ motivo: reason }),
+      });
+      setVouchers((current) => current.filter((voucher) => voucher.id !== rejectTarget.id));
+      setRejectTarget(null);
+      setReason("");
+      toast.success("Comprobante rechazado. El jugador podrá enviar uno nuevo.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo rechazar");
+    }
   };
 
   return (

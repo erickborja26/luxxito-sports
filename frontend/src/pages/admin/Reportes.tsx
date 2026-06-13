@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarX2, DollarSign, Download, Percent, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -20,44 +20,52 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const incomeData = [
-  { day: "Lun", income: 1380, reservations: 15 },
-  { day: "Mar", income: 1640, reservations: 18 },
-  { day: "Mié", income: 1510, reservations: 17 },
-  { day: "Jue", income: 2180, reservations: 23 },
-  { day: "Vie", income: 2940, reservations: 29 },
-  { day: "Sáb", income: 3420, reservations: 34 },
-  { day: "Dom", income: 2640, reservations: 27 },
-];
-
-const occupancyData = [
-  { court: "Cancha 1", occupancy: 88, hours: 74 },
-  { court: "Cancha 2", occupancy: 71, hours: 60 },
-  { court: "Pádel A", occupancy: 92, hours: 77 },
-  { court: "Tenis 1", occupancy: 54, hours: 45 },
-];
-
-const cancellationTrend = [
-  { week: "Sem 1", cancellations: 8, rate: 5.6 },
-  { week: "Sem 2", cancellations: 6, rate: 4.1 },
-  { week: "Sem 3", cancellations: 7, rate: 4.7 },
-  { week: "Sem 4", cancellations: 4, rate: 2.8 },
-];
-
-const cancellationReasons = [
-  { name: "Cambio de planes", value: 38 },
-  { name: "Clima", value: 24 },
-  { name: "Error de pago", value: 21 },
-  { name: "Mantenimiento", value: 17 },
-];
+import { api, Paginated, unwrap } from "@/lib/api";
+import { mapReservation } from "@/lib/domain";
 
 const colors = ["hsl(var(--accent))", "hsl(var(--info))", "hsl(var(--warning))", "hsl(var(--destructive))"];
 const tooltipStyle = { background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 12 };
 
 export default function Reportes() {
-  const [from, setFrom] = useState("2026-06-01");
-  const [to, setTo] = useState("2026-06-30");
+  const today = new Date().toLocaleDateString("en-CA");
+  const [from, setFrom] = useState(`${today.slice(0, 8)}01`);
+  const [to, setTo] = useState(today);
+  const [kpis, setKpis] = useState<any>({});
+  const [incomeData, setIncomeData] = useState<any[]>([]);
+  const [occupancyData, setOccupancyData] = useState<any[]>([]);
+  const [cancellationTrend, setCancellationTrend] = useState<any[]>([]);
+  const [cancellationReasons, setCancellationReasons] = useState<any[]>([]);
+
+  const load = async () => {
+    if (!from || !to || to < from) return;
+    const query = `?desde=${from}&hasta=${to}`;
+    const [kpiData, incomeRows, occupancyRows, reservationRows] = await Promise.all([
+      api<any>(`/reportes/kpis/${query}`),
+      api<any[]>(`/reportes/ingresos/${query}`),
+      api<any[]>(`/reportes/ocupacion/${query}`),
+      api<Paginated<any> | any[]>("/reservas/?page_size=100"),
+    ]);
+    const reservations = unwrap(reservationRows).map(mapReservation)
+      .filter((item) => item.fechaInicio.slice(0, 10) >= from && item.fechaInicio.slice(0, 10) <= to);
+    setKpis(kpiData);
+    setIncomeData(incomeRows.map((row) => ({
+      day: row.reservation__scheduled_date,
+      income: Number(row.ingresos),
+    })));
+    const maxReservations = Math.max(1, ...occupancyRows.map((row) => row.reservas));
+    setOccupancyData(occupancyRows.map((row) => ({
+      court: row.court__name,
+      occupancy: Math.round(row.reservas / maxReservations * 100),
+      hours: row.reservas,
+    })));
+    const cancelled = reservations.filter((item) => item.estado === "CANCELADA").length;
+    setCancellationTrend([{ week: `${from} a ${to}`, cancellations: cancelled, rate: Number(kpiData.tasa_cancelacion) }]);
+    setCancellationReasons(cancelled ? [{ name: "Cancelaciones registradas", value: cancelled }] : []);
+  };
+
+  useEffect(() => {
+    load().catch((error) => toast.error(error.message));
+  }, [from, to]);
 
   const validateRange = () => {
     if (!from || !to || to < from) {
@@ -69,7 +77,13 @@ export default function Reportes() {
 
   const exportReport = () => {
     if (!validateRange()) return;
-    toast.success("Reporte preparado. La descarga se simula en esta versión frontend.");
+    const payload = JSON.stringify({ desde: from, hasta: to, kpis, ingresos: incomeData, ocupacion: occupancyData }, null, 2);
+    const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `reporte-${from}-${to}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -85,10 +99,10 @@ export default function Reportes() {
 
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         {[
-          { label: "Ingresos del mes", value: "S/ 38,420", detail: "+12% vs. mes anterior", icon: DollarSign },
-          { label: "Ocupación promedio", value: "76.3%", detail: "+5.2 puntos", icon: Percent },
-          { label: "Reservas completadas", value: "486", detail: "+8% vs. mes anterior", icon: TrendingUp },
-          { label: "Tasa de cancelación", value: "4.2%", detail: "-1.1 puntos", icon: CalendarX2 },
+          { label: "Ingresos del periodo", value: `S/ ${Number(kpis.ingresos ?? 0).toFixed(2)}`, detail: "Pagos aprobados", icon: DollarSign },
+          { label: "Reservas totales", value: String(kpis.reservas_totales ?? 0), detail: "En el rango elegido", icon: Percent },
+          { label: "Reservas confirmadas", value: String(kpis.reservas_confirmadas ?? 0), detail: "Con pago aprobado", icon: TrendingUp },
+          { label: "Tasa de cancelación", value: `${Number(kpis.tasa_cancelacion ?? 0).toFixed(1)}%`, detail: "En el periodo", icon: CalendarX2 },
         ].map((kpi) => (
           <Card key={kpi.label} className="p-5">
             <kpi.icon className="mb-3 h-5 w-5 text-accent" />
@@ -155,9 +169,8 @@ export default function Reportes() {
           <Card className="p-5">
             <h2 className="font-semibold">Resumen semanal</h2>
             <div className="mt-4 space-y-4">
-              <div className="rounded-xl bg-muted/50 p-4"><div className="text-xs text-muted-foreground">Total semanal</div><div className="text-2xl font-bold">S/ 15,710</div></div>
-              <div className="rounded-xl bg-muted/50 p-4"><div className="text-xs text-muted-foreground">Ticket promedio</div><div className="text-2xl font-bold">S/ 96.38</div></div>
-              <div className="rounded-xl bg-muted/50 p-4"><div className="text-xs text-muted-foreground">Mejor día</div><div className="text-2xl font-bold">Sábado</div><div className="text-xs text-accent">S/ 3,420</div></div>
+              <div className="rounded-xl bg-muted/50 p-4"><div className="text-xs text-muted-foreground">Total del periodo</div><div className="text-2xl font-bold">S/ {Number(kpis.ingresos ?? 0).toFixed(2)}</div></div>
+              <div className="rounded-xl bg-muted/50 p-4"><div className="text-xs text-muted-foreground">Ticket promedio</div><div className="text-2xl font-bold">S/ {kpis.reservas_confirmadas ? (Number(kpis.ingresos) / kpis.reservas_confirmadas).toFixed(2) : "0.00"}</div></div>
             </div>
           </Card>
         </TabsContent>

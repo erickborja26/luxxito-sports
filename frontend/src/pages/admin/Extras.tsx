@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { AlertTriangle, Edit, Package, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -8,18 +8,33 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Extra, extrasMock } from "@/data/mock";
+import { api, Paginated, unwrap } from "@/lib/api";
+import { Extra, mapExtra } from "@/lib/domain";
 
-type ExtraForm = Omit<Extra, "id">;
+type ExtraForm = Pick<Extra, "nombre" | "tipo" | "cantidad" | "estado" | "precio">;
 
 const emptyExtra: ExtraForm = { nombre: "", tipo: "Equipo", cantidad: 1, estado: "OPERATIVO", precio: 10 };
 
 export default function Extras() {
-  const [extras, setExtras] = useState<Extra[]>(extrasMock);
+  const [extras, setExtras] = useState<Extra[]>([]);
+  const [complexId, setComplexId] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Extra | null>(null);
   const [form, setForm] = useState<ExtraForm>(emptyExtra);
+
+  const load = async () => {
+    const [extrasData, complexes] = await Promise.all([
+      api<Paginated<any> | any[]>("/extras/?page_size=100"),
+      api<Paginated<any> | any[]>("/complejos/?page_size=100"),
+    ]);
+    setExtras(unwrap(extrasData).map(mapExtra));
+    setComplexId(unwrap(complexes)[0]?.id || "");
+  };
+
+  useEffect(() => {
+    load().catch((error) => toast.error(error.message));
+  }, []);
 
   const openNew = () => {
     setEditingId(null);
@@ -33,7 +48,7 @@ export default function Extras() {
     setDialogOpen(true);
   };
 
-  const saveExtra = (event: FormEvent) => {
+  const saveExtra = async (event: FormEvent) => {
     event.preventDefault();
     if (!form.nombre.trim() || !form.tipo.trim()) {
       toast.error("Completa el nombre y tipo del extra.");
@@ -43,18 +58,29 @@ export default function Extras() {
       toast.error("El stock y el precio no pueden ser negativos.");
       return;
     }
-    if (editingId) {
-      setExtras((current) => current.map((extra) => extra.id === editingId ? { ...extra, ...form } : extra));
-      toast.success("Extra actualizado.");
-    } else {
-      setExtras((current) => [...current, { ...form, id: crypto.randomUUID() }]);
-      toast.success("Extra agregado al inventario.");
+    try {
+      await api(editingId ? `/extras/${editingId}/` : "/extras/", {
+        method: editingId ? "PATCH" : "POST",
+        body: JSON.stringify({
+          complejo_id: complexId,
+          nombre: form.nombre,
+          tipo: form.tipo,
+          cantidad: form.cantidad,
+          estado: form.estado,
+          precio: form.precio,
+          activo: true,
+        }),
+      });
+      await load();
+      toast.success(editingId ? "Extra actualizado." : "Extra agregado al inventario.");
+      setDialogOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar");
     }
-    setDialogOpen(false);
   };
 
   const totalUnits = extras.reduce((sum, extra) => sum + extra.cantidad, 0);
-  const alerts = extras.filter((extra) => extra.cantidad === 0 || extra.estado === "DAÑADO").length;
+  const alerts = extras.filter((extra) => extra.cantidad === 0 || extra.estado === "DANADO").length;
 
   return (
     <div className="space-y-6">
@@ -71,7 +97,7 @@ export default function Extras() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {extras.map((extra) => {
-          const hasAlert = extra.cantidad === 0 || extra.estado === "DAÑADO";
+          const hasAlert = extra.cantidad === 0 || extra.estado === "DANADO";
           return (
             <Card key={extra.id} className={`p-5 ${hasAlert ? "border-destructive/40 bg-destructive/5" : ""}`}>
               <div className="mb-4 flex items-start justify-between">
@@ -104,7 +130,7 @@ export default function Extras() {
               <div><Label htmlFor="stock">Stock</Label><Input id="stock" type="number" min="0" value={form.cantidad} onChange={(event) => setForm({ ...form, cantidad: Number(event.target.value) })} /></div>
               <div><Label htmlFor="extra-price">Precio (S/)</Label><Input id="extra-price" type="number" min="0" value={form.precio} onChange={(event) => setForm({ ...form, precio: Number(event.target.value) })} /></div>
             </div>
-            <div><Label>Estado</Label><Select value={form.estado} onValueChange={(value: Extra["estado"]) => setForm({ ...form, estado: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="OPERATIVO">Operativo</SelectItem><SelectItem value="DAÑADO">Dañado</SelectItem></SelectContent></Select></div>
+            <div><Label>Estado</Label><Select value={form.estado} onValueChange={(value: Extra["estado"]) => setForm({ ...form, estado: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="OPERATIVO">Operativo</SelectItem><SelectItem value="DANADO">Dañado</SelectItem></SelectContent></Select></div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
               <Button type="submit">{editingId ? "Guardar cambios" : "Agregar extra"}</Button>
@@ -119,7 +145,17 @@ export default function Extras() {
           <p className="text-sm text-muted-foreground">¿Deseas eliminar <strong>{deleteTarget?.nombre}</strong> del inventario? Ya no podrá agregarse a nuevas reservas.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={() => { if (deleteTarget) setExtras((current) => current.filter((extra) => extra.id !== deleteTarget.id)); setDeleteTarget(null); toast.success("Extra eliminado."); }}>Eliminar</Button>
+            <Button variant="destructive" onClick={async () => {
+              if (!deleteTarget) return;
+              try {
+                await api(`/extras/${deleteTarget.id}/`, { method: "DELETE" });
+                setExtras((current) => current.filter((extra) => extra.id !== deleteTarget.id));
+                setDeleteTarget(null);
+                toast.success("Extra eliminado.");
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "No se pudo eliminar");
+              }
+            }}>Eliminar</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -23,7 +23,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { incidenciasMock, Incidencia } from "@/data/mock";
+import { api, Paginated, unwrap } from "@/lib/api";
+import { Incidencia } from "@/lib/domain";
 import { StatusBadge } from "@/components/StatusBadge";
 import {
   Activity,
@@ -41,17 +42,17 @@ import { toast } from "sonner";
 
 /* ─── Severidad: color + ícono + texto (accesibilidad §7.3 guía) ─── */
 const SEV_CONFIG = {
-  baja: {
+  BAJA: {
     label: "Baja",
     icon: Minus,
     cls: "bg-emerald-50 text-emerald-700 border border-emerald-200",
   },
-  media: {
+  MEDIA: {
     label: "Media",
     icon: TriangleAlert,
     cls: "bg-amber-50 text-amber-700 border border-amber-200",
   },
-  alta: {
+  ALTA: {
     label: "Alta",
     icon: ShieldAlert,
     cls: "bg-red-50 text-red-700 border border-red-200",
@@ -109,10 +110,28 @@ const METRICAS = [
 
 /* ─── Componente principal ─── */
 export default function Soporte() {
-  const [list, setList] = useState<Incidencia[]>(incidenciasMock);
+  const [list, setList] = useState<Incidencia[]>([]);
+  const [metrics, setMetrics] = useState<any>(null);
   const [sel, setSel] = useState<Incidencia | null>(null);
   const [selEstado, setSelEstado] = useState<string>("");
   const [comment, setComment] = useState("");
+
+  useEffect(() => {
+    Promise.all([
+      api<Paginated<any> | any[]>("/soporte/incidencias/?page_size=100"),
+      api<any>("/soporte/metricas/"),
+    ]).then(([incidents, metricData]) => {
+      setList(unwrap(incidents).map((item: any) => ({
+        id: item.id,
+        titulo: item.titulo,
+        descripcion: item.descripcion,
+        estado: item.estado,
+        severidad: item.severidad,
+        comentarioResolucion: item.comentario_resolucion,
+      })));
+      setMetrics(metricData);
+    }).catch((error) => toast.error(error.message));
+  }, []);
 
   /* Abrir detalle de incidencia */
   const abrirDetalle = (inc: Incidencia) => {
@@ -122,19 +141,22 @@ export default function Soporte() {
   };
 
   /* Guardar cambios: estado + comentario */
-  const guardar = () => {
+  const guardar = async () => {
     if (!sel) return;
-    setList((prev) =>
-      prev.map((x) =>
-        x.id === sel.id
-          ? { ...x, estado: selEstado as Incidencia["estado"] }
-          : x
-      )
-    );
-    /* [Feedback inmediato] — toast confirma la acción completada */
-    toast.success("Incidencia actualizada");
-    setSel(null);
-    setComment("");
+    try {
+      await api(`/soporte/incidencias/${sel.id}/`, {
+        method: "PATCH",
+        body: JSON.stringify({ estado: selEstado, comentario_resolucion: comment }),
+      });
+      setList((prev) => prev.map((x) =>
+        x.id === sel.id ? { ...x, estado: selEstado as Incidencia["estado"], comentarioResolucion: comment } : x
+      ));
+      toast.success("Incidencia actualizada");
+      setSel(null);
+      setComment("");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo actualizar");
+    }
   };
 
   return (
@@ -195,7 +217,7 @@ export default function Soporte() {
       <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-3.5 flex items-center gap-3">
         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden="true" />
         <span className="text-sm text-emerald-800">
-          <b className="font-semibold">142</b> bloqueos temporales expirados liberados
+          <b className="font-semibold">{metrics?.bloqueos_expirados_24h ?? 0}</b> bloqueos temporales expirados liberados
           automáticamente en las últimas 24 h.
         </span>
       </div>

@@ -18,16 +18,17 @@ export default function Register() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.email || !form.name) return toast.error("Completa los campos requeridos");
-    const gmailRegex = /^[^\s@]+@gmail\.com$/i;
-    if (!gmailRegex.test(String(form.email).trim())) {
-      return toast.error("Solo se permiten correos @gmail.com");
-    }
+    if (!form.email || !form.name || !form.password) return toast.error("Completa los campos requeridos");
     setCargando(true);
-    await new Promise(r => setTimeout(r, 700));
-    register({ ...form, email: String(form.email).trim().toLowerCase(), role });
-    toast.success("Cuenta creada correctamente");
-    nav(role === "admin" ? "/admin/onboarding" : "/jugador");
+    try {
+      await register({ ...form, email: String(form.email).trim().toLowerCase(), role });
+      toast.success("Cuenta creada correctamente");
+      nav(role === "admin" ? "/admin/onboarding" : "/jugador");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo crear la cuenta");
+    } finally {
+      setCargando(false);
+    }
   };
 
   const set = (k: string) => (e: any) => setForm({ ...form, [k]: e.target.value });
@@ -85,12 +86,12 @@ export default function Register() {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="r-email">Correo</Label>
-                    <Input id="r-email" className="h-11" type="email" placeholder="tu@gmail.com" onChange={set("email")} />
+                    <Input id="r-email" className="h-11" type="email" placeholder="tu@correo.com" onChange={set("email")} />
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="r-pass">Contraseña</Label>
-                  <Input id="r-pass" className="h-11" type="password" placeholder="••••••••" />
+                  <Input id="r-pass" className="h-11" type="password" placeholder="Mínimo 8 caracteres" onChange={set("password")} />
                 </div>
               </TabsContent>
 
@@ -111,11 +112,11 @@ export default function Register() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="r-email2">Correo</Label>
-                  <Input id="r-email2" className="h-11" type="email" placeholder="tu@gmail.com" onChange={set("email")} />
+                  <Input id="r-email2" className="h-11" type="email" placeholder="tu@correo.com" onChange={set("email")} />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="r-pass2">Contraseña</Label>
-                  <Input id="r-pass2" className="h-11" type="password" placeholder="••••••••" />
+                  <Input id="r-pass2" className="h-11" type="password" placeholder="Mínimo 8 caracteres" onChange={set("password")} />
                 </div>
               </TabsContent>
 

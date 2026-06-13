@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarX2, Eye, Search, Wrench, X } from "lucide-react";
 import { toast } from "sonner";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -10,27 +10,44 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { canchas, nombreComplejo, Reserva, reservasMock } from "@/data/mock";
+import { api, Paginated, unwrap } from "@/lib/api";
+import { Cancha, mapCourt, mapReservation, ReservaJugador } from "@/lib/domain";
 
 type BlockForm = { canchaId: string; date: string; start: string; end: string; reason: string };
 
 export default function ReservasAdmin() {
-  const [reservations, setReservations] = useState<Reserva[]>(reservasMock);
+  const [reservations, setReservations] = useState<ReservaJugador[]>([]);
+  const [canchas, setCanchas] = useState<Cancha[]>([]);
   const [status, setStatus] = useState("todas");
   const [date, setDate] = useState("");
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<Reserva | null>(null);
-  const [cancelTarget, setCancelTarget] = useState<Reserva | null>(null);
+  const [selected, setSelected] = useState<ReservaJugador | null>(null);
+  const [cancelTarget, setCancelTarget] = useState<ReservaJugador | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [blockDialog, setBlockDialog] = useState(false);
   const [confirmBlock, setConfirmBlock] = useState(false);
   const [blockForm, setBlockForm] = useState<BlockForm>({
-    canchaId: canchas[0].id,
-    date: "2026-06-15",
+    canchaId: "",
+    date: new Date().toLocaleDateString("en-CA"),
     start: "12:00",
     end: "13:00",
     reason: "",
   });
+
+  const load = async () => {
+    const [reservationsData, courtsData] = await Promise.all([
+      api<Paginated<any> | any[]>("/reservas/?page_size=100"),
+      api<Paginated<any> | any[]>("/canchas/?page_size=100"),
+    ]);
+    const courtList = unwrap(courtsData).map(mapCourt);
+    setReservations(unwrap(reservationsData).map(mapReservation));
+    setCanchas(courtList);
+    setBlockForm((current) => ({ ...current, canchaId: current.canchaId || courtList[0]?.id || "" }));
+  };
+
+  useEffect(() => {
+    load().catch((error) => toast.error(error.message));
+  }, []);
 
   const filtered = useMemo(() => reservations.filter((reservation) => {
     const matchesStatus = status === "todas" || reservation.estado === status;
@@ -47,18 +64,25 @@ export default function ReservasAdmin() {
     ? (new Date(cancelTarget.fechaInicio).getTime() - Date.now()) / 3_600_000 >= 24
     : false;
 
-  const cancelReservation = () => {
+  const cancelReservation = async () => {
     if (!cancelTarget) return;
     if (!cancelReason.trim()) {
       toast.error("Escribe el motivo de la cancelación.");
       return;
     }
-    setReservations((current) => current.map((reservation) => (
-      reservation.id === cancelTarget.id ? { ...reservation, estado: "CANCELADA" } : reservation
-    )));
-    setCancelTarget(null);
-    setCancelReason("");
-    toast.success(hasRefund ? "Reserva cancelada. Se procesará el reembolso." : "Reserva cancelada sin reembolso.");
+    try {
+      const data = await api<any>(`/reservas/${cancelTarget.id}/cancelar/`, {
+        method: "POST",
+        body: JSON.stringify({ motivo: cancelReason }),
+      });
+      const updated = mapReservation(data);
+      setReservations((current) => current.map((reservation) => reservation.id === cancelTarget.id ? updated : reservation));
+      setCancelTarget(null);
+      setCancelReason("");
+      toast.success(hasRefund ? "Reserva cancelada. Se procesará el reembolso." : "Reserva cancelada sin reembolso.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo cancelar");
+    }
   };
 
   const requestBlock = () => {
@@ -85,23 +109,23 @@ export default function ReservasAdmin() {
     setConfirmBlock(true);
   };
 
-  const createBlock = () => {
-    const court = canchas.find((item) => item.id === blockForm.canchaId);
-    const block: Reserva = {
-      id: `BLQ-${String(reservations.length + 1).padStart(3, "0")}`,
-      canchaId: blockForm.canchaId,
-      canchaNombre: court?.nombre ?? "Cancha",
-      complejoNombre: nombreComplejo(court?.complejoId ?? "c1"),
-      jugador: `Bloqueo: ${blockForm.reason}`,
-      fechaInicio: `${blockForm.date}T${blockForm.start}`,
-      fechaFin: `${blockForm.date}T${blockForm.end}`,
-      precio: 0,
-      estado: "BLOQUEADA",
-    };
-    setReservations((current) => [block, ...current]);
-    setConfirmBlock(false);
-    setBlockForm((current) => ({ ...current, reason: "" }));
-    toast.success("Horario bloqueado correctamente.");
+  const createBlock = async () => {
+    try {
+      await api(`/canchas/${blockForm.canchaId}/cierres/`, {
+        method: "POST",
+        body: JSON.stringify({
+          fecha: blockForm.date,
+          hora_inicio: blockForm.start,
+          hora_fin: blockForm.end,
+          motivo: blockForm.reason,
+        }),
+      });
+      setConfirmBlock(false);
+      setBlockForm((current) => ({ ...current, reason: "" }));
+      toast.success("Horario bloqueado correctamente.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo bloquear");
+    }
   };
 
   return (

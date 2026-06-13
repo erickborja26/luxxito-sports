@@ -1,60 +1,56 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { Reserva, reservasMock } from "@/data/mock";
+import { createContext, useCallback, useContext, useEffect, useState, ReactNode } from "react";
+import { api, Paginated, unwrap } from "@/lib/api";
+import { ExtraReservado, mapReservation, ReservaJugador } from "@/lib/domain";
+import { useAuth } from "./AuthContext";
 
-export interface ExtraReservado { nombre: string; cantidad: number; precio: number }
-
-export interface ReservaJugador extends Reserva {
-  codigo: string;
-  extras?: ExtraReservado[];
-}
+export type { ExtraReservado, ReservaJugador };
 
 interface ReservasCtx {
   reservas: ReservaJugador[];
-  agregarReserva: (r: Omit<ReservaJugador, "id" | "codigo">) => ReservaJugador;
-  cancelarReserva: (id: string) => void;
+  loading: boolean;
+  recargar: () => Promise<void>;
+  cancelarReserva: (id: string, motivo?: string) => Promise<ReservaJugador>;
 }
-
-const STORAGE_KEY = "luxxito_reservas_jugador";
-
-const generarCodigo = () =>
-  "LX-" + Math.random().toString(36).slice(2, 8).toUpperCase();
-
-const semilla: ReservaJugador[] = reservasMock.map((r) => ({
-  ...r,
-  codigo: "LX-" + r.id.toUpperCase().padStart(6, "0"),
-}));
 
 const Ctx = createContext<ReservasCtx>({} as ReservasCtx);
 
 export const ReservasProvider = ({ children }: { children: ReactNode }) => {
-  const [reservas, setReservas] = useState<ReservaJugador[]>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch {
-      /* datos corruptos: se reinicia con la semilla */
+  const { user } = useAuth();
+  const [reservas, setReservas] = useState<ReservaJugador[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const recargar = useCallback(async () => {
+    if (!user) {
+      setReservas([]);
+      return;
     }
-    return semilla;
-  });
+    setLoading(true);
+    try {
+      const data = await api<Paginated<any> | any[]>("/reservas/?page_size=100");
+      setReservas(unwrap(data).map(mapReservation));
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(reservas));
-  }, [reservas]);
+    void recargar();
+  }, [recargar]);
 
-  const agregarReserva = (r: Omit<ReservaJugador, "id" | "codigo">) => {
-    const nueva: ReservaJugador = { ...r, id: crypto.randomUUID(), codigo: generarCodigo() };
-    setReservas((prev) => [nueva, ...prev]);
-    return nueva;
-  };
-
-  const cancelarReserva = (id: string) => {
-    setReservas((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, estado: "CANCELADA" as const } : r))
-    );
+  const cancelarReserva = async (id: string, motivo = "Cancelada por el usuario") => {
+    const data = await api<any>(`/reservas/${id}/cancelar/`, {
+      method: "POST",
+      body: JSON.stringify({ motivo }),
+    });
+    const updated = mapReservation(data);
+    setReservas((current) => current.map((item) => item.id === id ? updated : item));
+    return updated;
   };
 
   return (
-    <Ctx.Provider value={{ reservas, agregarReserva, cancelarReserva }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ reservas, loading, recargar, cancelarReserva }}>
+      {children}
+    </Ctx.Provider>
   );
 };
 

@@ -7,14 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, CheckCircle, Loader2, AlertTriangle, ImageIcon, X } from "lucide-react";
 import { toast } from "sonner";
-import { useReservas, ExtraReservado } from "@/context/ReservasContext";
-import { useAuth } from "@/context/AuthContext";
-import { Cancha, nombreComplejo } from "@/data/mock";
+import { api } from "@/lib/api";
+import { ReservaJugador } from "@/lib/domain";
 
 type EstadoComprobante = {
-  sel: { cancha: Cancha; slot: { hora: string; precio: number }; fecha: string };
+  reserva: ReservaJugador;
   total: number;
-  extras: ExtraReservado[];
   metodo: string;
 };
 
@@ -23,11 +21,10 @@ const MAX_MB = 5;
 export default function Comprobante() {
   const loc = useLocation();
   const nav = useNavigate();
-  const { user } = useAuth();
-  const { agregarReserva } = useReservas();
   const datos = loc.state as EstadoComprobante | null;
 
   const [preview, setPreview] = useState<string | null>(null);
+  const [archivo, setArchivo] = useState<File | null>(null);
   const [errorArchivo, setErrorArchivo] = useState<string | null>(null);
   const [met, setMet] = useState(datos?.metodo === "Tarjeta" ? "Yape" : datos?.metodo || "Yape");
   const [monto, setMonto] = useState(String(datos?.total ?? ""));
@@ -53,14 +50,17 @@ export default function Comprobante() {
     if (!f.type.startsWith("image/")) {
       setErrorArchivo("El archivo debe ser una imagen (JPG, PNG o similar).");
       setPreview(null);
+      setArchivo(null);
       return;
     }
     if (f.size > MAX_MB * 1024 * 1024) {
       setErrorArchivo(`La imagen pesa demasiado. El máximo es ${MAX_MB} MB.`);
       setPreview(null);
+      setArchivo(null);
       return;
     }
     setErrorArchivo(null);
+    setArchivo(f);
     const r = new FileReader();
     r.onload = () => setPreview(r.result as string);
     r.readAsDataURL(f);
@@ -68,27 +68,25 @@ export default function Comprobante() {
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!preview) {
+    if (!archivo) {
       setErrorArchivo("Sube una foto o captura de tu comprobante para continuar.");
       return;
     }
     setEnviando(true);
-    await new Promise(r => setTimeout(r, 1200));
-    const horaFin = `${String(Number(datos.sel.slot.hora.slice(0, 2)) + 1).padStart(2, "0")}:00`;
-    const reserva = agregarReserva({
-      canchaId: datos.sel.cancha.id,
-      canchaNombre: datos.sel.cancha.nombre,
-      complejoNombre: nombreComplejo(datos.sel.cancha.complejoId),
-      jugador: user?.name || "Jugador",
-      fechaInicio: `${datos.sel.fecha}T${datos.sel.slot.hora}`,
-      fechaFin: `${datos.sel.fecha}T${horaFin}`,
-      precio: total,
-      estado: "PENDIENTE",
-      metodoPago: met,
-      extras: datos.extras,
-    });
-    toast.success("Comprobante recibido. Lo validaremos en máximo 30 minutos.");
-    nav("/jugador/confirmacion", { state: { reserva, pendiente: true } });
+    try {
+      const body = new FormData();
+      body.append("metodo", met === "Yape" ? "BILLETERA_DIGITAL" : "TRANSFERENCIA");
+      body.append("monto_pagado", monto);
+      body.append("referencia", referencia);
+      body.append("comprobante", archivo);
+      await api(`/reservas/${datos.reserva.id}/comprobante/`, { method: "POST", body });
+      const reserva = { ...datos.reserva, metodoPago: met, estado: "PENDIENTE" as const };
+      toast.success("Comprobante recibido. Lo validaremos en máximo 30 minutos.");
+      nav("/jugador/confirmacion", { state: { reserva, pendiente: true } });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo enviar el comprobante");
+      setEnviando(false);
+    }
   };
 
   return (
@@ -100,7 +98,7 @@ export default function Comprobante() {
         </p>
 
         <div className="p-3 mb-5 bg-muted rounded-lg text-sm flex justify-between">
-          <span>{datos.sel.cancha.nombre} · {datos.sel.slot.hora}</span>
+          <span>{datos.reserva.canchaNombre} · {datos.reserva.fechaInicio.slice(11, 16)}</span>
           <span className="font-bold">Total: S/ {total}</span>
         </div>
 

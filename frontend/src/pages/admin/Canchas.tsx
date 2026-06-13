@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Edit, Plus, Power, Save, Trash2, Trophy, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -10,16 +10,24 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Cancha, canchas as initialCanchas, deportes } from "@/data/mock";
+import { api, Paginated, unwrap } from "@/lib/api";
+import { Cancha, Complejo, Deporte, mapCourt } from "@/lib/domain";
 
-type CourtForm = Omit<Cancha, "id" | "complejoId" | "activo">;
+type CourtForm = {
+  nombre: string;
+  deporte: string;
+  superficie: string;
+  techado: boolean;
+  iluminacion: boolean;
+  tarifaEstandar: number;
+};
 type Schedule = { day: string; enabled: boolean; open: string; close: string };
 type MaintenanceBlock = { id: string; canchaId: string; date: string; start: string; end: string; reason: string };
 
 const emptyCourt: CourtForm = {
   nombre: "",
-  deporte: "Fútbol",
-  superficie: "Grass sintético",
+  deporte: "",
+  superficie: "SINTETICO",
   techado: false,
   iluminacion: true,
   tarifaEstandar: 120,
@@ -36,27 +44,72 @@ const initialSchedules: Schedule[] = [
 ];
 
 export default function Canchas() {
-  const [courts, setCourts] = useState<Cancha[]>(initialCanchas.filter((court) => court.complejoId === "c1"));
+  const [courts, setCourts] = useState<Cancha[]>([]);
+  const [deportes, setDeportes] = useState<Deporte[]>([]);
+  const [complex, setComplex] = useState<Complejo | null>(null);
   const [courtDialog, setCourtDialog] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [courtForm, setCourtForm] = useState<CourtForm>(emptyCourt);
   const [deleteTarget, setDeleteTarget] = useState<Cancha | null>(null);
   const [schedules, setSchedules] = useState(initialSchedules);
-  const [maintenance, setMaintenance] = useState<MaintenanceBlock[]>([
-    { id: "m1", canchaId: "ca2", date: "2026-06-14", start: "10:00", end: "12:00", reason: "Mantenimiento de luminarias" },
-  ]);
+  const [maintenance, setMaintenance] = useState<MaintenanceBlock[]>([]);
   const [maintenanceForm, setMaintenanceForm] = useState<Omit<MaintenanceBlock, "id">>({
-    canchaId: initialCanchas[0].id,
-    date: "2026-06-15",
+    canchaId: "",
+    date: new Date().toLocaleDateString("en-CA"),
     start: "08:00",
     end: "10:00",
     reason: "",
   });
   const [confirmMaintenance, setConfirmMaintenance] = useState(false);
 
+  const load = async () => {
+    const [complexesData, courtsData, sportsData, closuresData] = await Promise.all([
+      api<Paginated<Complejo> | Complejo[]>("/complejos/?page_size=100"),
+      api<Paginated<any> | any[]>("/canchas/?page_size=100"),
+      api<Deporte[]>("/deportes/"),
+      api<Paginated<any> | any[]>("/cierres/?page_size=100"),
+    ]);
+    const selectedComplex = unwrap(complexesData)[0] || null;
+    const courtList = unwrap(courtsData).map(mapCourt);
+    setComplex(selectedComplex);
+    setCourts(courtList);
+    setDeportes(sportsData);
+    setMaintenance(unwrap(closuresData).map((item: any) => ({
+      id: item.id,
+      canchaId: item.cancha_id,
+      date: item.fecha,
+      start: item.hora_inicio,
+      end: item.hora_fin,
+      reason: item.motivo,
+    })));
+    if (selectedComplex?.horarios?.length) {
+      setSchedules(initialSchedules.map((schedule, index) => {
+        const apiSchedule = selectedComplex.horarios?.find((item) => item.dia_semana === index + 1);
+        return apiSchedule ? {
+          ...schedule,
+          enabled: apiSchedule.habilitado,
+          open: apiSchedule.hora_apertura.slice(0, 5),
+          close: apiSchedule.hora_cierre.slice(0, 5),
+        } : schedule;
+      }));
+    }
+    setMaintenanceForm((current) => ({
+      ...current,
+      canchaId: current.canchaId || courtList[0]?.id || "",
+    }));
+    setCourtForm((current) => ({
+      ...current,
+      deporte: current.deporte || sportsData[0]?.nombre || "",
+    }));
+  };
+
+  useEffect(() => {
+    load().catch((error) => toast.error(error.message));
+  }, []);
+
   const openNewCourt = () => {
     setEditingId(null);
-    setCourtForm(emptyCourt);
+    setCourtForm({ ...emptyCourt, deporte: deportes[0]?.nombre || "" });
     setCourtDialog(true);
   };
 
@@ -73,7 +126,7 @@ export default function Canchas() {
     setCourtDialog(true);
   };
 
-  const saveCourt = (event: FormEvent) => {
+  const saveCourt = async (event: FormEvent) => {
     event.preventDefault();
     if (!courtForm.nombre.trim() || !courtForm.superficie.trim()) {
       toast.error("Completa el nombre y la superficie de la cancha.");
@@ -84,17 +137,29 @@ export default function Canchas() {
       return;
     }
 
-    if (editingId) {
-      setCourts((current) => current.map((court) => court.id === editingId ? { ...court, ...courtForm } : court));
-      toast.success("Cancha actualizada.");
-    } else {
-      setCourts((current) => [
-        ...current,
-        { ...courtForm, id: crypto.randomUUID(), complejoId: "c1", activo: true },
-      ]);
-      toast.success("Cancha registrada.");
+    if (!complex) return toast.error("Primero registra un complejo.");
+    const sport = deportes.find((item) => item.nombre === courtForm.deporte);
+    if (!sport) return toast.error("Selecciona un deporte válido.");
+    try {
+      await api(editingId ? `/canchas/${editingId}/` : "/canchas/", {
+        method: editingId ? "PATCH" : "POST",
+        body: JSON.stringify({
+          complejo_id: complex.id,
+          deporte_id: sport.id,
+          nombre: courtForm.nombre,
+          tipo_superficie: courtForm.superficie,
+          techada: courtForm.techado,
+          iluminacion: courtForm.iluminacion,
+          tarifa_estandar: courtForm.tarifaEstandar,
+          activa: true,
+        }),
+      });
+      await load();
+      toast.success(editingId ? "Cancha actualizada." : "Cancha registrada.");
+      setCourtDialog(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo guardar");
     }
-    setCourtDialog(false);
   };
 
   const updateSchedule = (index: number, field: keyof Schedule, value: string | boolean) => {
@@ -103,13 +168,27 @@ export default function Canchas() {
     )));
   };
 
-  const saveSchedules = () => {
+  const saveSchedules = async () => {
     const invalid = schedules.some((schedule) => schedule.enabled && schedule.close <= schedule.open);
     if (invalid) {
       toast.error("La hora de cierre debe ser posterior a la apertura.");
       return;
     }
-    toast.success("Horarios guardados correctamente.");
+    if (!complex) return;
+    try {
+      await api(`/complejos/${complex.id}/horarios/`, {
+        method: "PUT",
+        body: JSON.stringify(schedules.map((schedule, index) => ({
+          dia_semana: index + 1,
+          habilitado: schedule.enabled,
+          hora_apertura: schedule.open,
+          hora_cierre: schedule.close,
+        }))),
+      });
+      toast.success("Horarios guardados correctamente.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudieron guardar");
+    }
   };
 
   const requestMaintenance = () => {
@@ -124,11 +203,31 @@ export default function Canchas() {
     setConfirmMaintenance(true);
   };
 
-  const createMaintenance = () => {
-    setMaintenance((current) => [...current, { ...maintenanceForm, id: crypto.randomUUID() }]);
-    setMaintenanceForm((current) => ({ ...current, reason: "" }));
-    setConfirmMaintenance(false);
-    toast.success("Horario bloqueado por mantenimiento.");
+  const createMaintenance = async () => {
+    try {
+      const closure = await api<any>(`/canchas/${maintenanceForm.canchaId}/cierres/`, {
+        method: "POST",
+        body: JSON.stringify({
+          fecha: maintenanceForm.date,
+          hora_inicio: maintenanceForm.start,
+          hora_fin: maintenanceForm.end,
+          motivo: maintenanceForm.reason,
+        }),
+      });
+      setMaintenance((current) => [...current, {
+        id: closure.id,
+        canchaId: maintenanceForm.canchaId,
+        date: closure.fecha,
+        start: closure.hora_inicio,
+        end: closure.hora_fin,
+        reason: closure.motivo,
+      }]);
+      setMaintenanceForm((current) => ({ ...current, reason: "" }));
+      setConfirmMaintenance(false);
+      toast.success("Horario bloqueado por mantenimiento.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo bloquear");
+    }
   };
 
   return (
@@ -183,7 +282,17 @@ export default function Canchas() {
                         size="icon"
                         variant="ghost"
                         aria-label={court.activo ? "Desactivar cancha" : "Activar cancha"}
-                        onClick={() => setCourts((current) => current.map((item) => item.id === court.id ? { ...item, activo: !item.activo } : item))}
+                        onClick={async () => {
+                          try {
+                            await api(`/canchas/${court.id}/`, {
+                              method: "PATCH",
+                              body: JSON.stringify({ activa: !court.activo }),
+                            });
+                            setCourts((current) => current.map((item) => item.id === court.id ? { ...item, activo: !item.activo } : item));
+                          } catch (error) {
+                            toast.error(error instanceof Error ? error.message : "No se pudo actualizar");
+                          }
+                        }}
                       >
                         <Power className={`h-4 w-4 ${court.activo ? "text-accent" : "text-muted-foreground"}`} />
                       </Button>
@@ -252,7 +361,15 @@ export default function Canchas() {
                       <div className="text-sm text-muted-foreground">{block.date} · {block.start} - {block.end}</div>
                       <div className="text-sm">{block.reason}</div>
                     </div>
-                    <Button size="sm" variant="outline" onClick={() => { setMaintenance((current) => current.filter((item) => item.id !== block.id)); toast.success("Bloqueo retirado."); }}>Retirar bloqueo</Button>
+                    <Button size="sm" variant="outline" onClick={async () => {
+                      try {
+                        await api(`/cierres/${block.id}/`, { method: "DELETE" });
+                        setMaintenance((current) => current.filter((item) => item.id !== block.id));
+                        toast.success("Bloqueo retirado.");
+                      } catch (error) {
+                        toast.error(error instanceof Error ? error.message : "No se pudo retirar");
+                      }
+                    }}>Retirar bloqueo</Button>
                   </div>
                 ))}
               </div>
@@ -267,7 +384,7 @@ export default function Canchas() {
           <form onSubmit={saveCourt} className="space-y-4">
             <div><Label htmlFor="court-name">Nombre</Label><Input id="court-name" placeholder="Ej. Cancha principal" value={courtForm.nombre} onChange={(event) => setCourtForm({ ...courtForm, nombre: event.target.value })} /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label>Deporte</Label><Select value={courtForm.deporte} onValueChange={(value) => setCourtForm({ ...courtForm, deporte: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{deportes.map((sport) => <SelectItem key={sport} value={sport}>{sport}</SelectItem>)}</SelectContent></Select></div>
+              <div><Label>Deporte</Label><Select value={courtForm.deporte} onValueChange={(value) => setCourtForm({ ...courtForm, deporte: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{deportes.map((sport) => <SelectItem key={sport.id} value={sport.nombre}>{sport.nombre}</SelectItem>)}</SelectContent></Select></div>
               <div><Label htmlFor="surface">Superficie</Label><Input id="surface" value={courtForm.superficie} onChange={(event) => setCourtForm({ ...courtForm, superficie: event.target.value })} /></div>
             </div>
             <div><Label htmlFor="rate">Tarifa estándar por hora (S/)</Label><Input id="rate" type="number" min="1" value={courtForm.tarifaEstandar} onChange={(event) => setCourtForm({ ...courtForm, tarifaEstandar: Number(event.target.value) })} /></div>
@@ -291,7 +408,17 @@ export default function Canchas() {
           </p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={() => { if (deleteTarget) setCourts((current) => current.filter((court) => court.id !== deleteTarget.id)); setDeleteTarget(null); toast.success("Cancha eliminada."); }}>Eliminar cancha</Button>
+            <Button variant="destructive" onClick={async () => {
+              if (!deleteTarget) return;
+              try {
+                await api(`/canchas/${deleteTarget.id}/`, { method: "DELETE" });
+                setCourts((current) => current.filter((court) => court.id !== deleteTarget.id));
+                setDeleteTarget(null);
+                toast.success("Cancha eliminada.");
+              } catch (error) {
+                toast.error(error instanceof Error ? error.message : "No se pudo eliminar");
+              }
+            }}>Eliminar cancha</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -149,5 +149,6 @@ import { ToastProvider, ToastViewport, Toast, ToastTitle, ToastDescription, Toas
 ## Recomendaciones generales
 - No uses estilos inline para la UI principal.
 - Usa los componentes compartidos en lugar de `className` arbitrarias siempre que sea posible.
-- Si un componente no existe, crea primero un wrapper en `src/components/ui`.
+- Si un componente no existe, crea primero un wrapper en
+  `frontend/src/components/ui`.
 - Mantén la nomenclatura de intención (`Primary`, `Secondary`, `Danger`) para botones y estados.
